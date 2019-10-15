@@ -1,4 +1,4 @@
-#Brief Overview#
+# Brief Overview #
 
 You are an asteroid mining prospector trainee.
 
@@ -16,13 +16,13 @@ Don't let your fuel (water) or shields (dirt/regolith) get too low or your craft
 
 Note: you can play here now: https://www.lexaloffle.com/bbs/?tid=35489
 
-#Controls and Interface#
+# Controls and Interface #
 
 You move between asteroids with the arrow keys. Use x key to start or continue.                                                                                                                                                                                                             
 
 Asteroids can contain a variety of materials.
 
-##Three materials can be sold on the market:##
+## Three materials can be sold on the market: ##
 
   Pink-ite : pink in your map
   Green-ite: green in your map                                                                                                                  
@@ -43,7 +43,7 @@ The exchange rate, for a particular Zone's market is shown in the area above you
 
 When your gold has reached the top of the bar, your spacecraft's fuel and shield algorithm will be upgraded. Press x to continue.  After upgrade, you will get gold equivalent to the green dots next to the gold bar.
 
-##Two other materials can be on asteroids:##
+## Two other materials can be on asteroids: ##
 
 Water : blue in your map
 Regolith (dirt) : brown in your map                                                                                                       
@@ -56,7 +56,7 @@ Your fuel (blue water) and shield (brown regolith/dirt) levels are shown in the 
 
 Your shield and fuel usage will be upgraded as you max out your gold.  This will help you get to Zone 5.
 
-#Thanks and Backstory#
+# Thanks and Backstory #
 
 Thanks go out to feedback on my initial asteroid generation effort by @freds72 :https://www.lexaloffle.com/bbs/?tid=34135 . I indeed used the 3d library by @electricgryphon.  I used rasterization code from @creamdog.
 
