@@ -25,8 +25,8 @@ Asteroids can contain a variety of materials.
 ## Three materials can be sold on the market: ##
 
   Pink-ite : pink in your map
-  Green-ite: green in your map                                                                                                                  
-  Yellow-ite: yellow in your map
+  
+  Green-ite: green in your map                                                                                                          Yellow-ite: yellow in your map
 
   When you land on an asteroid with these materials:
     1. you will be charged a fee
