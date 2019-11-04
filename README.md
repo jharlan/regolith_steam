@@ -1,5 +1,7 @@
 # Brief Overview #
 
+Note: you can play here now: https://www.lexaloffle.com/bbs/?tid=35489
+
 You are an asteroid mining prospector trainee.
 
 You are remotely controlling an asteroid prospecting spacecraft.
