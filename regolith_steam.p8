@@ -21,11 +21,6 @@ color_list = {
     {4,4,9,9,15,15,7,7,7,7}     -- peach 15
   }
 
--- font sprite mapping big
-font={a=32,b=33,c=34,d=35,e=36,f=37,g=38,h=39,i=40,
-j=41,k=42,l=43,m=44,n=45,o=46,p=47,q=48,r=49,s=50,
-t=51,u=52,v=53,w=54,x=55,y=56,z=57,[" "]=58,["<"]=59,[">"]=60}
-
 --static icosohedran face definition
 ast_faces =  {
   {3,7,8},
@@ -96,6 +91,11 @@ function print3(str,x,y,col)
   end
   pal()
 end
+
+-- font sprite mapping big
+font={a=32,b=33,c=34,d=35,e=36,f=37,g=38,h=39,i=40,
+j=41,k=42,l=43,m=44,n=45,o=46,p=47,q=48,r=49,s=50,
+t=51,u=52,v=53,w=54,x=55,y=56,z=57,[" "]=58,["<"]=59,[">"]=60}
 
 function init_asteroid()
   add_new_ast(player.x-delta,player.y-delta)
