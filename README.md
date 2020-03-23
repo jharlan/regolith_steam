@@ -1,11 +1,11 @@
-#Controls#
+# Controls #
 
 Arrow keys move.
 (x) to restart.
 
 You can play the game here: https://www.lexaloffle.com/bbs/edit.php?pid=74080
 
-#About#
+# About #
 
 An asteroid mining roguelike.
 
