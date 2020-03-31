@@ -19,7 +19,7 @@ lvl_list={
   "2@".. -- water use upper bound : distance
   "2@".. -- dirt use upper bound : solar wind
   "    blue water asteroids refuel your ship...   ,"..
-  "    brown dirt asteroids fix your shields...   ,"..
+  "    brown regolith asteroids fix your shields...   ,"..
   "    yellow and pink asteroids are mined and sold for coins...   ,"..
   "      collect coins!,"..
   "    moving decreases fuel and shield... press arrow to continue...  @"..
