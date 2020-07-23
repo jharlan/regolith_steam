@@ -7,11 +7,6 @@ __lua__
 
 --static icosohedran face definition
 astf="3,7,8@8,7,2@12,1,2@1,9,2@5,10,9@9,10,8@10,4,3@11,3,4@6,12,11@12,7,11@1,6,5@6,4,5@7,3,11@7,12,2@2,9,8@10,3,8@4,6,11@1,12,6@4,10,5@1,5,9"
-
-allp={14,10,6}
-vols={8,13,18,23,28}
-m_names={"PINK","YELLOW"}
-
 --- level definition ---
 lvl_list={
   "3@".. -- level goal
@@ -55,23 +50,20 @@ lvl_list={
 -- barren stripe
 ,"5@6@5@5@  so far away each rock  @13,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=51,113,111|111|001,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
 }
---@ ------------------------@
-dtb={} -- dir to button translate
-dtb.n,dtb.w,dtb.s,dtb.e=3,1,2,0
 
 colors = "0,0,0,1,1@0,1,1,2,2@0,1,1,3,3@0,1,1,4,4@0,0,1,5,5@0,5,5,6,6@5,5,6,7,7@0,2,2,2,2@2,2,4,4,9@1,1,1,10,10@0,1,1,3,3@0,1,1,12,12@1,1,5,5,13@1,1,2,14,14@4,4,9,9,15"
 
-local tconf={}
-tconf.water = {"FUEL","EMPTY","        restarting!"}
-tconf.dirt = {"SHIELD","DOWN!","        restarting!"}
-tconf.restart = {"START","OVER!","        restarting!"}
-tconf.goal = {"NEXT","LEVEL","    loading new level..."}
+allp={14,10,6}
+vols={8,13,18,23,28}
+m_names={"PINK","YELLOW"}
+sequence_text={
+  water = {"FUEL","EMPTY","        restarting!"},
+  dirt = {"SHIELD","DOWN!","        restarting!"},
+  restart = {"START","OVER!","        restarting!"},
+  goal = {"NEXT","LEVEL","    loading new level..."}
+}
 
-function set_move_arrows(curr_dir)
-  tc.s0=""  
-  tc.aw,tc.ae,tc.an,tc.as=(curr_dir=="e"),(curr_dir=="w"),(curr_dir=="s"),(curr_dir=="n")
-  return curr_dir
-end
+---
 
 function _init()
   cur_frame,max_sensor,mbc,px0,py0,fntspr,fntdefaultcol,fntx,fnty,ast_log=0,96,9,0,50,64,7,{},{},{}
@@ -88,14 +80,8 @@ function _init()
     add(ast_faces,str_to_table(",",t,true))  
   end
 
-  --interface config
-  dudm,dm,wudm,wm,st,sm=28,72,28,72,28,72
-
-  delta = 2         -- distance between asteroids
-  em0,em1=105,45   -- volume constants
-
   -- player config
-  player = new_object()
+  player = {}--new_3d_object()
   player.lvl,player.z=1,5.2
   --player.z=5.2  --15
 
@@ -105,7 +91,7 @@ function _init()
 end
 
 function game_sequence()
-  g_active     = cocreate(active_sequence)
+  g_active = cocreate(active_sequence)
   g_transition = cocreate(transition_sequence)
   while true do
     if (g_active and costatus(g_active) != "dead") then
@@ -144,9 +130,9 @@ function transition_sequence()
     for i=1,80 do
       toggle=get_toggle(toggle)
       tc.ac = toggle and 5 or col 
-      tc.s0=tconf[over_reason][1]
-      tc.s2=tconf[over_reason][2]
-      lines = {0,tconf[over_reason][3]}
+      tc.s0=sequence_text[over_reason][1]
+      tc.s2=sequence_text[over_reason][2]
+      lines = {0,sequence_text[over_reason][3]}
       yield()
     end
     player.lvl = (over_reason == "goal") and (player.lvl+1) or 1
@@ -186,10 +172,9 @@ function sense_elements(ast)
       (player.lvl == 1 and player.move_count <10 and player.message_index<4 ) and 42 or 15
 
     local toggle=true
-    tc.s0 = "MINING"
-    tc.c0=15
+    tc.s0,tc.c0 = "MINING",15
     for i=1,2 do
-      local vol_proxy = (i==1) and em0 or em1
+      local vol_proxy = (i==1) and 105 or 45 --vol proxy constants
       local cur_pal = ast.palette[i] 
       if (cur_pal==1 or cur_pal==2) then
         tc.c2=allp[ast.palette[i]]
@@ -201,8 +186,8 @@ function sense_elements(ast)
           tc.s2 =(toggle and player.lvl==1) and m_names[cur_pal] or ""
 
           -- is mineral bin full
-          if (player.sensor[cur_pal]+ast.ub*vol_proxy/delay >= sm) then
-            player.sensor[cur_pal] = sm
+          if (player.sensor[cur_pal]+ast.lower_scale*vol_proxy/delay >= 72) then
+            player.sensor[cur_pal] = 72
 
             -- coin flipping
             for k=1,10 do 
@@ -227,7 +212,7 @@ function sense_elements(ast)
 
           else
             -- increment sensor
-            player.sensor[cur_pal]+=ast.ub*vol_proxy/delay
+            player.sensor[cur_pal]+=ast.lower_scale*vol_proxy/delay
           end
 
           yield()
@@ -247,7 +232,7 @@ function sense_elements(ast)
   local pal_dist = {[6]=10,[5]=2} -- base 6 was 10
   if (ast.w>0) pal_dist[12]=2 -- add some water
   if (ast.d>0) pal_dist[4]=4
-  ast.ne = build_dist(pal_dist) 
+  ast.pal_dist = build_dist(pal_dist) 
   ast_log[hkey(pairing(ast.x,ast.y))] = true
 end
 
@@ -256,14 +241,14 @@ function gather_resource(ast,resource)
   local delay = (player.lvl == 1 and player.move_count <10) and 42 or 15
   local msg=(resource=="water") and {"FUEL",12,2} or {"SHIELD",4,3}
   if ((ast.w>0 and resource=="water") or (ast.d>0 and resource=="dirt")) then
-    local dif = (player[resource]<=wm) and (wm-player[resource]) or 0
+    local dif = (player[resource]<=72) and (72-player[resource]) or 0
     tc.s0,tc.c0,tc.c2="MINING",15,msg[2]
     for i=1,delay do
       toggle=get_toggle(toggle)
       tc.ac = toggle and 5 or msg[2]
       tc.s2 = (toggle and player.lvl==1) and msg[1] or ""
-      if (player[resource]+dif/delay >= wm) then
-        player[resource] = wm
+      if (player[resource]+dif/delay >= 72) then
+        player[resource] = 72
       else
         player[resource] +=dif/delay
       end
@@ -278,28 +263,15 @@ function gather_resource(ast,resource)
 end
 
 function move_target(dir)
-  local steps = 8
-  local mag = delta/steps
-  local ship_mag = 32/steps
-  local bmag = 30/steps
-  for i=1,steps do
-    if (dir == "n") then
-      ship.y -= ship_mag
-      player.y -= mag
-      beacons.yoffset -= bmag
-    elseif (dir == "e") then
-      ship.x += ship_mag
-      player.x += mag
-      beacons.xoffset += bmag
-    elseif (dir == "s") then
-      ship.y += ship_mag
-      player.y += mag
-      beacons.yoffset += bmag
-    elseif (dir == "w") then
-      ship.x -= ship_mag
-      player.x -= mag
-      beacons.xoffset -= bmag
-    end
+  local dm = {["n"]={0,-1},["e"]={1,0},["s"]={0,1},["w"]={-1,0}}
+  local dx,dy=dm[dir][1],dm[dir][2]
+  for i=1,8 do
+    ship.x += dx*4
+    ship.y += dy*4
+    player.x += dx*0.25
+    player.y += dy*0.25
+    beacons.xoffset += dx*3.75
+    beacons.yoffset += dy*3.75
     yield()
   end
   beacons.xoffset,beacons.yoffset,beacons.x,beacons.y=0,0,player.x,player.y
@@ -342,13 +314,16 @@ function move_value(is_brown,ast_nb)
 end
 
 function thrust_ship(dir)
+  local dtb={n=3,w=1,s=2,e=0} -- dir to button translate
   local ship_mag,init_ship,steps=2,ship.spr,16
-  ship.thrust=true
   local toggle=true
   local dw,dd=0,0 -- decrements
   local assist=(player.lvl==1 and player.move_count<3)
+  ship.thrust=true
+
   for i=1,steps do
     toggle=get_toggle(toggle)
+
     tc.ac = toggle and 5 or 11
 
     if (i==9) then
@@ -453,6 +428,13 @@ function get_toggle(tog)
   return tog
 end
 
+function init_move(curr_dir)
+  tc.s0=""  
+  tc.aw,tc.ae,tc.an,tc.as=(curr_dir=="e"),(curr_dir=="w"),(curr_dir=="s"),(curr_dir=="n")
+  s_moving=cocreate(move_sequence)
+  return curr_dir
+end
+
 function active_sequence()
   level_init()
   local dir
@@ -462,29 +444,18 @@ function active_sequence()
     toggle=get_toggle(toggle)
     if (cur_frame%6==0) lines[1] += 1
     if (not s_moving) then
-      tc.ac = toggle and 5 or 11
-      tc.s0,tc.c0="READY",15
-      if(btnp(1))then     -- w
-        dir=set_move_arrows("w")
-        s_moving=cocreate(move_sequence)
-      elseif(btnp(0))then -- e
-        dir=set_move_arrows("e")
-        s_moving=cocreate(move_sequence)
-      elseif(btnp(3))then -- n
-        dir=set_move_arrows("n")
-        s_moving=cocreate(move_sequence)
-      elseif(btnp(2))then -- s
-        dir=set_move_arrows("s")
-        s_moving=cocreate(move_sequence)
+      tc.s0,tc.c0,tc.ac="READY",15,toggle and 5 or 11
+      if(btnp(1))     then dir=init_move("w")
+      elseif(btnp(0)) then dir=init_move("e")
+      elseif(btnp(3)) then dir=init_move("n")
+      elseif(btnp(2)) then dir=init_move("s")
       end
     end
-
     if (s_moving and costatus(s_moving) != "dead") then
       coresume(s_moving,dir)
     else
       s_moving=nil
     end
-
     update_objects()
     yield()
   end
@@ -528,9 +499,7 @@ function str_to_table(delim,tbl_str,isnum)
   for i=1,len do
     cs = sub(tbl_str,i,i)
     if (cs==delim or not delim) then -- delim can be nil
-      if (not delim) then
-        val = cs
-      end
+      if (not delim) val = cs
       val = isnum and tonum(val) or val
       add(rt,val)
       val=""
@@ -590,17 +559,11 @@ function load_lvl(enc_lvl)
 end
 
 function init_asteroid()
-  add_new_ast(player.x-delta,player.y-delta)
-  add_new_ast(player.x,player.y-delta)
-  add_new_ast(player.x+delta,player.y-delta)
-
-  add_new_ast(player.x-delta,player.y)
-  add_new_ast(player.x+delta,player.y)
-
-  add_new_ast(player.x-delta,player.y+delta)
-  add_new_ast(player.x,player.y+delta)
-  add_new_ast(player.x+delta,player.y+delta)
-
+  for r=-2,2,2 do
+    for c=-2,2,2 do
+      if (r~=0 and c~=0) add_new_ast(player.x+r,player.y+c)
+    end
+  end
   ast_log[hkey(pairing(player.x,player.y))] = true -- always start on blank
 end
 
@@ -623,41 +586,31 @@ function get_from_dist(dl)
 end
 
 function add_new_ast(qx,qy)
-
   if (qx!=px0 and qy!=py0) then
     srand(abs(pairing(qx,qy))+gseed)
-    local dist_from_start =flr(sqrt((px0-qx)*(px0-qx)+(py0-qy)*(py0-qy)))
-    local ring = flr((dist_from_start+.01)/clvl.ring_size)%#clvl+1
-    if (get_from_dist(build_dist(
-          clvl[ring].exist
-        ))==2 and not in_view(qx,qy)) then
+    local ring =
+      flr((flr(sqrt((px0-qx)*(px0-qx)+(py0-qy)*(py0-qy)))+.01)/clvl.ring_size)%#clvl+1
+    local clvl_ring = clvl[ring]
 
-      local pc = get_from_dist(
-          build_dist(
-            clvl[ring].prim_c 
-          )) -- primary
-      local sc = get_from_dist(
-          build_dist(
-             clvl[ring].sec_c[pc] 
-          )
-        )   -- secondary
-      local v =  vols[get_from_dist(build_dist(
-        clvl[ring].vol[pc]
-      ))]/100      -- volume
-      local w = get_from_dist(build_dist(
-        clvl[ring].water[pc]
-      ))-1           -- water
-      local d = get_from_dist(build_dist(
-        clvl[ring].dirt[pc]
-      ))-1            -- dirt
+    if (get_from_dist(build_dist(clvl_ring.exist))==2 and 
+        not in_view(qx,qy)) then
 
-      if(ast_log[hkey(pairing(qx,qy))]) pc,sc = 3,3
+      local pc = get_from_dist(build_dist(clvl_ring.prim_c )) -- primary
+      local sc = get_from_dist(build_dist(clvl_ring.sec_c[pc]))   -- secondary
+      local lower_scale = vols[get_from_dist(build_dist(clvl_ring.vol[pc]))]/100
+      local w = get_from_dist(build_dist(clvl_ring.water[pc]))-1 -- water
+      local d = get_from_dist(build_dist(clvl_ring.dirt[pc]))-1 -- dirt
+
+      if(ast_log[hkey(pairing(qx,qy))]) pc,sc = 3,3  -- empty
 
       load_ast(
-        ast_vertices(v),
-        ast_faces,qx,qy,0,0,-.35,0,false,
+        ast_vertices(lower_scale),
+        ast_faces,
+        qx,qy,0,
+        0,-.35,0,
+        false,
         {pc,sc},
-        v,
+        lower_scale,
         w,
         d
       )
@@ -666,32 +619,27 @@ function add_new_ast(qx,qy)
   end
 end
 
--- generates shape and volume
-function sa(ub) -- rand scaled edge a
-  return 0.9*(rnd(0.5)+ub)
+-- scales vertex dimension
+function sv(lower_scale) 
+  return rnd(0.5)+lower_scale
 end
 
-function sb(ub) -- rand scaled edge b
-  return 1.1*(rnd(0.5)+ub)
-end
-
-function ast_vertices(ub)
+function ast_vertices(lower_scale)
   return  {
-    {0,-sa(ub),-sb(ub)},
-    {0,sa(ub),-sb(ub)},
-    {0,sa(ub),sb(ub)},
-    {0,-sa(ub),sb(ub)},
-    {-sa(ub),-sb(ub),0},
-    {sa(ub),-sb(ub),0},
-    {sa(ub),sb(ub),0},
-    {-sa(ub),sb(ub),0},
-    {-sb(ub),0,-sa(ub)},
-    {-sb(ub),0,sa(ub)},
-    {sb(ub),0,sa(ub)},
-    {sb(ub),0,-sa(ub)}
+    {0,-sv(lower_scale),-sv(lower_scale)},
+    {0,sv(lower_scale),-sv(lower_scale)},
+    {0,sv(lower_scale),sv(lower_scale)},
+    {0,-sv(lower_scale),sv(lower_scale)},
+    {-sv(lower_scale),-sv(lower_scale),0},
+    {sv(lower_scale),-sv(lower_scale),0},
+    {sv(lower_scale),sv(lower_scale),0},
+    {-sv(lower_scale),sv(lower_scale),0},
+    {-sv(lower_scale),0,-sv(lower_scale)},
+    {-sv(lower_scale),0,sv(lower_scale)},
+    {sv(lower_scale),0,sv(lower_scale)},
+    {sv(lower_scale),0,-sv(lower_scale)}
   }
 end
-
 function in_view(px,py) -- leaving out z since will be constant
   for ca in all(ast_list) do
     if (ca.x==px and ca.y==py) return true
@@ -700,44 +648,20 @@ function in_view(px,py) -- leaving out z since will be constant
 end
 
 function spawn_belt(dir)
-  if (dir == "w") then -- moving left so adding to the right
-
-    add_new_ast(player.x-delta*2.0,player.y-delta)  -- top
-    add_new_ast(player.x-delta*2.0,player.y)        -- middle
-    add_new_ast(player.x-delta*2.0,player.y+delta)  -- bot
-
-    set_ast_cull(player.x+delta*2.0,player.y-delta)
-    set_ast_cull(player.x+delta*2.0,player.y)
-    set_ast_cull(player.x+delta*2.0,player.y+delta)
-
-  elseif (dir == "e") then
-
-    add_new_ast(player.x+delta*2.0,player.y-delta)
-    add_new_ast(player.x+delta*2.0,player.y)
-    add_new_ast(player.x+delta*2.0,player.y+delta)
-
-    set_ast_cull(player.x-delta*2.0,player.y-delta)
-    set_ast_cull(player.x-delta*2.0,player.y)
-    set_ast_cull(player.x-delta*2.0,player.y+delta)
-
-  elseif (dir == "n") then
-
-    add_new_ast(player.x-delta,player.y-delta*2.0) -- left
-    add_new_ast(player.x,      player.y-delta*2.0) -- middle
-    add_new_ast(player.x+delta,player.y-delta*2.0) -- right
-
-    set_ast_cull(player.x-delta,player.y+delta*2.0)
-    set_ast_cull(player.x,      player.y+delta*2.0)
-    set_ast_cull(player.x+delta,player.y+delta*2.0)
-
-  elseif (dir == "s") then
-    add_new_ast(player.x-delta,player.y+delta*2.0) -- left
-    add_new_ast(player.x,      player.y+delta*2.0) -- middle
-    add_new_ast(player.x+delta,player.y+delta*2.0) -- right
-
-    set_ast_cull(player.x-delta,player.y-delta*2.0)
-    set_ast_cull(player.x,      player.y-delta*2.0)
-    set_ast_cull(player.x+delta,player.y-delta*2.0)
+  for c=-2,2,2 do
+    if (dir == "w") then -- moving left so adding to the right
+      add_new_ast(player.x-4,player.y+c)  -- top
+      set_ast_cull(player.x+4,player.y+c)
+    elseif (dir == "e") then
+      add_new_ast(player.x+4,player.y+c)  -- top
+      set_ast_cull(player.x-4,player.y+c)
+    elseif (dir == "n") then
+      add_new_ast(player.x+c,player.y-4)
+      set_ast_cull(player.x+c,player.y+4)
+    elseif (dir == "s") then
+      add_new_ast(player.x+c,player.y+4)
+      set_ast_cull(player.x+c,player.y-4)
+    end
   end
 end
 
@@ -759,30 +683,27 @@ end
 function level_init()
   purge_all=false 
   gseed = stat(95)+stat(94)+stat(93)+stat(0)
+
+  -- global objects --
   ast_list={}    -- stores asteroid belt
   ast_log={}     -- which asteroids have been mined/sold
-
-  beacons={}
-  beacons.xoffset,beacons.yoffset,beacons.x,beacons.y=0,0,px0,py0
-
+  beacons={
+    xoffset=0,
+    yoffset=0,
+    x=px0,
+    y=py0
+  }
   lines={}  -- console content
-
   tc={} -- center text
   tc_init()
-
-  coin={}
-  coin.spr={{82,98},{82,98}}
-  coin.offset={0,0}
-
-  ship = {}
-  ship.spr,ship.x,ship.y=25,59,59
+  coin={spr={{82,98},{82,98}},offset={0,0}}
+  ship={spr=25,x=59,y=59}
 
   player.x=px0--2000   --0
   player.y=py0--3000    --8
-  player.dirt=dm
-  player.water=wm
-  player.sensor=(player.lvl==1) and {30,30} or {2,2} -- {{element,amount},{element,amount}...}
-  --player.sensor = {65,65}
+  player.dirt=72
+  player.water=72
+  player.sensor=(player.lvl==1) and {30,30} or {2,2} 
   player.move_count=0
   player.message_index=1
   player.goal_attain=0
@@ -847,7 +768,7 @@ end
 -- limits roughly -180,180
 -- roughly distance 254
 function pairing(x,y)
-  x,y = flr(x/delta),flr(y/delta) -- translating to 1 step
+  x,y = flr(x/2),flr(y/2) -- translating to 1 step
   local xa = (x>=0) and 2*x or 2*x-1
   local ya = (y>=0) and 2*y or 2*y-1
   if (xa>=ya) then
@@ -1095,12 +1016,12 @@ function draw_vert_meters()
   printv("fuel",121,9,15,true)
 
   --water storage
-  rectfill(120,wm+wudm-player.water,124,wm+wudm,12) -- fill
+  rectfill(120,100-player.water,124,100,12) -- fill
   -- dirt storage
-  rectfill(114,dm+dudm-player.dirt,118,dm+dudm,4) -- fill
+  rectfill(114,100-player.dirt,118,100,4) -- fill
   -- sensor
-  rectfill(2,st+sm-player.sensor[2],6,st+sm,10)
-  rectfill(8,st+sm-player.sensor[1],12,st+sm,14)
+  rectfill(2,100-player.sensor[2],6,100,10)
+  rectfill(8,100-player.sensor[1],12,100,14)
 
   -- coins
   spr(coin.spr[2][2],1,19-coin.offset[2])
@@ -1142,7 +1063,7 @@ function _draw()
   draw_display()
 end
 
-function creamdog_tri(x1,y1,x2,y2,x3,y3,br,palette,ne,w,d)
+function creamdog_tri(x1,y1,x2,y2,x3,y3,br,pal_dist,w,d)
 
   local list = {{flr(x1),flr(y1)},{flr(x2),flr(y2)},{flr(x3),flr(y3)}}
 
@@ -1151,9 +1072,9 @@ function creamdog_tri(x1,y1,x2,y2,x3,y3,br,palette,ne,w,d)
   local xs = list[1][1] -- start
   local xe = list[1][1] -- end
 
-  local vx1 = (list[2][1]-list[1][1])/(list[2][2]-list[1][2]) -- (x2-x1)/(y2-x1)
-  local vx2 = (list[3][1]-list[2][1])/(list[3][2]-list[2][2]) -- (x3-x2)/(y3-y2)
-  local vx3 = (list[3][1]-list[1][1])/(list[3][2]-list[1][2]) -- (x3-x1)/(y3-y1)
+  local vx1 = (list[2][1]-list[1][1])/(list[2][2]-list[1][2]) 
+  local vx2 = (list[3][1]-list[2][1])/(list[3][2]-list[2][2]) 
+  local vx3 = (list[3][1]-list[1][1])/(list[3][2]-list[1][2]) 
 
   if flr((list[2][2]-list[1][2])) == 0 then
     vx2 = vx3
@@ -1178,7 +1099,7 @@ function creamdog_tri(x1,y1,x2,y2,x3,y3,br,palette,ne,w,d)
       if (x0+i <= 127 and x0+i >= 0 and y <= 127 and y >= 0) then
         memset(
           gafc(flr((x0+i)/2),y),
-          color_list[get_from_dist(ne)][br]+
+          color_list[get_from_dist(pal_dist)][br]+
           0,1 -- optimization to only calc color for even i
           --color_list[get_from_dist(ne)][br]*16,1
         )
@@ -1195,6 +1116,76 @@ function creamdog_tri(x1,y1,x2,y2,x3,y3,br,palette,ne,w,d)
   end
   return list
  end
+
+function load_ast(base_object_vertices,base_object_faces,
+                  x,y,z,
+                  ax,ay,az,
+                  obstacle,
+                  palette,lower_scale,w,d)
+
+  local new_ast={radius=0,
+    visible=false,
+    palette={},
+    x=0,
+    y=0,
+    z=0,
+    rx=0,
+    ry=0,
+    rz=0,
+    tx=0,
+    ty=0,
+    tz=0,
+    ax=0,
+    ay=0,
+    az=0,
+    sx=0,
+    sy=0,
+    vx=0,
+    vy=0,
+    vz=0,
+    faces={},
+    base_faces=base_object_faces,
+    vertices={},
+    t_vertices={},
+    vertices=base_object_vertices,
+    ax=ax or 0,
+    ay=ay or 0,
+    az=az or 0,
+    x=x or 0,
+    y=y or 0,
+    z=z or 0,
+    lower_scale = lower_scale,
+    w = w,
+    d = d
+  }
+
+  -- build palette distribution
+  local pal_dist = {[allp[palette[1]]]=6,[allp[palette[2]]]=4,[6]=10,[5]=2}
+  if (w>0) pal_dist[12]=2 -- add some water
+  if (d>0) pal_dist[4]=4
+  new_ast.pal_dist = build_dist(pal_dist)
+
+  --make local deep copy of faces
+  for i=1,#base_object_faces do
+    new_ast.faces[i]={}
+    for j=1,#base_object_faces[i] do
+      new_ast.faces[i][j]=base_object_faces[i][j]
+    end
+  end
+
+  --make local deep copy of translated vertices. we share the initial vertices
+  for i=1,#base_object_vertices do
+    new_ast.t_vertices[i]={}
+      for j=1,3 do
+        new_ast.t_vertices[i][j]=new_ast.vertices[i][j]
+      end
+  end
+
+  transform_object(new_ast)
+  set_radius(new_ast)
+  add(ast_list,new_ast)
+end
+
 
 ------------------Electric Gryphon's 3D Library-----------------------------------------
 
@@ -1244,56 +1235,6 @@ function vector_cross_3d(px,py,pz,ax,ay,az,bx,by,bz)
   return dx,dy,dz
 end
 
-function load_ast(object_vertices,object_faces,
-          x,y,z,ax,ay,az,obstacle,palette,ub,w,d)--,nb)
-
-  object=new_object()
-  object.vertices=object_vertices
-
-  --make local deep copy of faces
-  object.base_faces=object_faces
-  object.faces={}
-  for i=1,#object_faces do
-    object.faces[i]={}
-    for j=1,#object_faces[i] do
-      object.faces[i][j]=object_faces[i][j]
-    end
-  end
-
-  object.radius=0
-
-  --make local deep copy of translated vertices
-  --we share the initial vertices
-  for i=1,#object_vertices do
-    object.t_vertices[i]={}
-      for j=1,3 do
-        object.t_vertices[i][j]=object.vertices[i][j]
-      end
-  end
-
-  object.ax=ax or 0
-  object.ay=ay or 0
-  object.az=az or 0
-
-  transform_object(object)
-  set_radius(object)        -- TODO: is this used? most likely no
-
-  object.x=x or 0
-  object.y=y or 0
-  object.z=z or 0
-  object.palette = palette
-
-  local pal_dist = {[allp[palette[1]]]=6,[allp[palette[2]]]=4,[6]=10,[5]=2} -- base 6 was 10
-  if (w>0) pal_dist[12]=2 -- add some water
-  if (d>0) pal_dist[4]=4
-  object.ne = build_dist(pal_dist)
-
-  object.ub = ub
-  object.w = w
-  object.d = d
-  return object
-end
-
 function set_radius(object)
   for vertex in all(object.vertices) do
       object.radius=max(
@@ -1302,25 +1243,11 @@ function set_radius(object)
   object.radius=sqrt(object.radius)
 end
 
-function new_object()
-  object={}
-  object.vertices={}
-  object.faces={}
-  object.t_vertices={} 
-  object.palette = {}
-  object.visible=false
-
-  object.x,object.y,object.z,object.rx,object.ry,object.rz,object.tx,object.ty,object.tz,object.ax,object.ay,object.az,object.sx,object.sy,object.vx,object.vy,object.vz=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-
-  add(ast_list,object)
-  return object
-end
-
 function delete_object(object)
   del(ast_list,object)
 end
 
-function new_triangle(p1x,p1y,p2x,p2y,p3x,p3y,z,c1,c2,ne)
+function new_triangle(p1x,p1y,p2x,p2y,p3x,p3y,z,c1,pal_dist)
   add(triangle_list,
     {
       p1x=p1x,
@@ -1330,9 +1257,8 @@ function new_triangle(p1x,p1y,p2x,p2y,p3x,p3y,z,c1,c2,ne)
       p3x=p3x,
       p3y=p3y,
       tz=z,
-      c1=c1,
-      c2=c2,
-      ne=ne
+      c1=c1, -- brightness
+      pal_dist=pal_dist
     }
   )
 end
@@ -1342,8 +1268,8 @@ function draw_triangle_list()
       local t=triangle_list[i]
       creamdog_tri( t.p1x,t.p1y,t.p2x,t.p2y,t.p3x,t.p3y,
         t.c1, -- brightness
-        t.c2, -- palette
-        t.ne, -- # not excluded neighbor colors repeated in palette
+        --t.c2, -- palette
+        t.pal_dist, -- # not excluded neighbor colors repeated in palette
         t.w,
         t.d
       )
@@ -1508,16 +1434,12 @@ function render_object(object)
             nx*=inv_dist ny*=inv_dist nz*=inv_dist      
 
             new_triangle(
-
                 s1x,s1y,
                 s2x,s2y,
                 s3x,s3y,
-
                 z_paint,
                 get_br(nx,ny,nz),
-
-                object.palette,
-                object.ne
+                object.pal_dist
             )
 
           end
@@ -1550,8 +1472,7 @@ function render_object(object)
               new_triangle(
                 s1x,s1y,s2x,s2y,s4x,s4y,z_paint,
                 get_br(nx,ny,nz),
-                object.palette,
-                object.ne
+                object.pal_dist
               )
             end
 
@@ -1559,8 +1480,7 @@ function render_object(object)
               new_triangle(
                 s2x,s2y,s4x,s4y,s3x,s3y,z_paint,
                 get_br(nx,ny,nz),
-                object.palette,
-                object.ne
+                object.pal_dist
               )
             end
           else
@@ -1574,7 +1494,7 @@ function render_object(object)
                 s1x,s1y,s2x,s2y,s3x,s3y,z_paint,
                 get_br(nx,ny,nz),
                 object.palette,
-                object.ne
+                object.pal_dist
               )
             end
           end
@@ -1724,6 +1644,6 @@ __gfx__
 00055000000550000005550000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000500000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __sfx__
-000100000061001710006100871011010087100070000700007002270000000000000000000000000002070000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01040000000500105002050030500405005050060500705008050090500a0500b0501b0002800028000190002700027000260000c0000a0000800004000030000300002000010000100000000000000000000000
 001000070131000310003100031000310003100131000000000003400035000370003700000000000002730029300000000000000000000000000000000000000000000000000000000000000000000000000000
 00100003167501c550167500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
