@@ -175,44 +175,47 @@ function sense_elements(ast)
     tc.s0,tc.c0 = "MINING",15
     for i=1,2 do
       local vol_proxy = (i==1) and 105 or 45 --vol proxy constants
-      local cur_pal = ast.palette[i] 
-      if (cur_pal==1 or cur_pal==2) then
+      local cur_mineral = ast.palette[i] 
+      if (cur_mineral==1 or cur_mineral==2) then
         tc.c2=allp[ast.palette[i]]
 
         for j=1,delay do
+
+          sfx(4+cur_mineral)
           toggle=get_toggle(toggle)
 
-          tc.ac =toggle and cur_pal or 5
-          tc.s2 =(toggle and player.lvl==1) and m_names[cur_pal] or ""
+          tc.ac =toggle and cur_mineral or 5
+          tc.s2 =(toggle and player.lvl==1) and m_names[cur_mineral] or ""
 
           -- is mineral bin full
-          if (player.sensor[cur_pal]+ast.lower_scale*vol_proxy/delay >= 72) then
-            player.sensor[cur_pal] = 72
+          if (player.sensor[cur_mineral]+ast.lower_scale*vol_proxy/delay >= 72) then
+            player.sensor[cur_mineral] = 72
 
             -- coin flipping
             for k=1,10 do 
-              coin.offset[cur_pal] = k
-              coin.spr[cur_pal][1] = 82+cur_frame%2
-              coin.spr[cur_pal][2] = 98+cur_frame%2
+              sfx(7)
+              coin.offset[cur_mineral] = k
+              coin.spr[cur_mineral][1] = 82+cur_frame%2
+              coin.spr[cur_mineral][2] = 98+cur_frame%2
               yield()
             end
 
-            coin.spr[cur_pal][1],coin.spr[cur_pal][2]=82,98
-            coin.offset[cur_pal]=0
+            coin.spr[cur_mineral][1],coin.spr[cur_mineral][2]=82,98
+            coin.offset[cur_mineral]=0
 
             -- redeem coin
-            if (cur_pal==1) then
+            if (cur_mineral==1) then
               player.goal_attain += 2
             else
               player.goal_attain += 1
             end
 
             -- reset sensor
-            player.sensor[cur_pal] = 0  
+            player.sensor[cur_mineral] = 0  
 
           else
             -- increment sensor
-            player.sensor[cur_pal]+=ast.lower_scale*vol_proxy/delay
+            player.sensor[cur_mineral]+=ast.lower_scale*vol_proxy/delay
           end
 
           yield()
@@ -238,6 +241,7 @@ end
 
 function gather_resource(ast,resource)
   local toggle=true
+  local sound = resource == "water" and 4 or 3
   local delay = (player.lvl == 1 and player.move_count <10) and 42 or 15
   local msg=(resource=="water") and {"FUEL",12,2} or {"SHIELD",4,3}
   if ((ast.w>0 and resource=="water") or (ast.d>0 and resource=="dirt")) then
@@ -247,6 +251,7 @@ function gather_resource(ast,resource)
       toggle=get_toggle(toggle)
       tc.ac = toggle and 5 or msg[2]
       tc.s2 = (toggle and player.lvl==1) and msg[1] or ""
+      sfx(sound)
       if (player[resource]+dif/delay >= 72) then
         player[resource] = 72
       else
@@ -265,6 +270,7 @@ end
 function move_target(dir)
   local dm = {["n"]={0,-1},["e"]={1,0},["s"]={0,1},["w"]={-1,0}}
   local dx,dy=dm[dir][1],dm[dir][2]
+  sfx(0)
   for i=1,8 do
     ship.x += dx*4
     ship.y += dy*4
@@ -292,6 +298,7 @@ end
 function lower_ship()
   local ast = get_c_ast()
   if (ast) then
+    sfx(1)
     for i=0,8 do
       if (i<3) then ship.spr = 20
       elseif (i>5) then ship.spr = 15
@@ -329,6 +336,7 @@ function thrust_ship(dir)
     if (i==9) then
 
       if(assist) tc.s0,tc.s2,tc.c0,tc.c2,lines="MOVE","COST",15,15,{0,clvl.lines[5]}
+      sfx(2)
 
       if (dir=="w") then
         tc.bnw,tc.bsw=true,true
@@ -354,6 +362,7 @@ function thrust_ship(dir)
           tc.ac = toggle and 5 or 11
           yield()
         end
+        sfx(0)
       end
 
     elseif(i>8) then
@@ -1063,6 +1072,70 @@ function _draw()
   draw_display()
 end
 
+function load_ast(base_object_vertices,base_object_faces,
+                  x,y,z,
+                  ax,ay,az,
+                  obstacle,
+                  palette,lower_scale,w,d)
+
+  local new_ast={radius=0,
+    visible=false,
+    palette=palette,
+    rx=0,
+    ry=0,
+    rz=0,
+    tx=0,
+    ty=0,
+    tz=0,
+    sx=0,
+    sy=0,
+    vx=0,
+    vy=0,
+    vz=0,
+    ax=ax or 0,
+    ay=ay or 0,
+    az=az or 0,
+    x=x or 0,
+    y=y or 0,
+    z=z or 0,
+    faces={},
+    base_faces=base_object_faces,
+    vertices={},
+    t_vertices={},
+    vertices=base_object_vertices,
+    lower_scale = lower_scale,
+    w = w,
+    d = d
+  }
+
+  -- build palette distribution
+  local pal_dist = {[allp[palette[1]]]=6,[allp[palette[2]]]=4,[6]=10,[5]=2}
+  if (w>0) pal_dist[12]=2 -- add some water
+  if (d>0) pal_dist[4]=4
+  new_ast.pal_dist = build_dist(pal_dist)
+
+  --make local deep copy of faces
+  for i=1,#base_object_faces do
+    new_ast.faces[i]={}
+    for j=1,#base_object_faces[i] do
+      new_ast.faces[i][j]=base_object_faces[i][j]
+    end
+  end
+
+  --make local deep copy of translated vertices. we share the initial vertices
+  for i=1,#base_object_vertices do
+    new_ast.t_vertices[i]={}
+      for j=1,3 do
+        new_ast.t_vertices[i][j]=new_ast.vertices[i][j]
+      end
+  end
+
+  transform_object(new_ast)
+  set_radius(new_ast)
+  add(ast_list,new_ast)
+end
+
+--- modified creamdog rasterizer
 function creamdog_tri(x1,y1,x2,y2,x3,y3,br,pal_dist,w,d)
 
   local list = {{flr(x1),flr(y1)},{flr(x2),flr(y2)},{flr(x3),flr(y3)}}
@@ -1117,74 +1190,6 @@ function creamdog_tri(x1,y1,x2,y2,x3,y3,br,pal_dist,w,d)
   return list
  end
 
-function load_ast(base_object_vertices,base_object_faces,
-                  x,y,z,
-                  ax,ay,az,
-                  obstacle,
-                  palette,lower_scale,w,d)
-
-  local new_ast={radius=0,
-    visible=false,
-    palette={},
-    x=0,
-    y=0,
-    z=0,
-    rx=0,
-    ry=0,
-    rz=0,
-    tx=0,
-    ty=0,
-    tz=0,
-    ax=0,
-    ay=0,
-    az=0,
-    sx=0,
-    sy=0,
-    vx=0,
-    vy=0,
-    vz=0,
-    faces={},
-    base_faces=base_object_faces,
-    vertices={},
-    t_vertices={},
-    vertices=base_object_vertices,
-    ax=ax or 0,
-    ay=ay or 0,
-    az=az or 0,
-    x=x or 0,
-    y=y or 0,
-    z=z or 0,
-    lower_scale = lower_scale,
-    w = w,
-    d = d
-  }
-
-  -- build palette distribution
-  local pal_dist = {[allp[palette[1]]]=6,[allp[palette[2]]]=4,[6]=10,[5]=2}
-  if (w>0) pal_dist[12]=2 -- add some water
-  if (d>0) pal_dist[4]=4
-  new_ast.pal_dist = build_dist(pal_dist)
-
-  --make local deep copy of faces
-  for i=1,#base_object_faces do
-    new_ast.faces[i]={}
-    for j=1,#base_object_faces[i] do
-      new_ast.faces[i][j]=base_object_faces[i][j]
-    end
-  end
-
-  --make local deep copy of translated vertices. we share the initial vertices
-  for i=1,#base_object_vertices do
-    new_ast.t_vertices[i]={}
-      for j=1,3 do
-        new_ast.t_vertices[i][j]=new_ast.vertices[i][j]
-      end
-  end
-
-  transform_object(new_ast)
-  set_radius(new_ast)
-  add(ast_list,new_ast)
-end
 
 
 ------------------Electric Gryphon's 3D Library-----------------------------------------
@@ -1644,6 +1649,11 @@ __gfx__
 00055000000550000005550000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000500000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __sfx__
-01040000000500105002050030500405005050060500705008050090500a0500b0501b0002800028000190002700027000260000c0000a0000800004000030000300002000010000100000000000000000000000
-001000070131000310003100031000310003100131000000000003400035000370003700000000000002730029300000000000000000000000000000000000000000000000000000000000000000000000000000
-00100003167501c550167500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00040000086300e7000663012700086301870007610076100761007610076100761007610136002060025600256001060012600056000a7000560004700037000370002700017000170000700007000070000700
+000400000700006650040000363002000016100130000000000003400035000370003700000000000002730029300000000000000000000000000000000000000000000000000000000000000000000000000000
+00100000003101c500167000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0001000016030250000520015200102000b2000520000200002000020000200002000020000200002000020000200002000020000200002000020000200002000020000200002000020000200002000020000200
+0001000026030000000b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000100001f3202c300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300
+000200001631016300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300
+000200002a31016320003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300
