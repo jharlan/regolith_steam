@@ -173,21 +173,23 @@ function sense_elements(ast)
 
     local toggle=true
     tc.s0,tc.c0 = "MINING",15
+
     for i=1,2 do
       local vol_proxy = (i==1) and 105 or 45 --vol proxy constants
       local cur_mineral = ast.palette[i] 
+
       if (cur_mineral==1 or cur_mineral==2) then
-        tc.c2=allp[ast.palette[i]]
+
+        tc.c2=allp[cur_mineral]
 
         for j=1,delay do
 
           sfx(4+cur_mineral)
           toggle=get_toggle(toggle)
-
           tc.ac =toggle and cur_mineral or 5
           tc.s2 =(toggle and player.lvl==1) and m_names[cur_mineral] or ""
 
-          -- is mineral bin full
+          -- is mineral bin full - TODO coin flip coroutine
           if (player.sensor[cur_mineral]+ast.lower_scale*vol_proxy/delay >= 72) then
             player.sensor[cur_mineral] = 72
 
@@ -240,30 +242,41 @@ function sense_elements(ast)
 end
 
 function gather_resource(ast,resource)
-  local toggle=true
-  local sound = resource == "water" and 4 or 3
-  local delay = (player.lvl == 1 and player.move_count <10) and 42 or 15
-  local msg=(resource=="water") and {"FUEL",12,2} or {"SHIELD",4,3}
+
   if ((ast.w>0 and resource=="water") or (ast.d>0 and resource=="dirt")) then
-    local dif = (player[resource]<=72) and (72-player[resource]) or 0
+
+    local toggle=true
+    local sound = resource == "water" and 4 or 3
+    local delay = (player.lvl == 1 and player.move_count <10) and 42 or 15
+    local msg=(resource=="water") and {"FUEL",12,2} or {"SHIELD",4,3}
     tc.s0,tc.c0,tc.c2="MINING",15,msg[2]
+
+    local dif = (player[resource]<=72) and (72-player[resource]) or 0
+
     for i=1,delay do
       toggle=get_toggle(toggle)
       tc.ac = toggle and 5 or msg[2]
       tc.s2 = (toggle and player.lvl==1) and msg[1] or ""
       sfx(sound)
+
       if (player[resource]+dif/delay >= 72) then
         player[resource] = 72
+        break
       else
         player[resource] +=dif/delay
       end
+
       yield()
+
     end
+
     tc_init()
+
     if (player.lvl == 1 and player.message_index == msg[3]-1) then
       player.message_index=msg[3]
       lines = {0,clvl.lines[msg[3]]}
     end
+
   end
 end
 
@@ -284,29 +297,24 @@ function move_target(dir)
 end
 
 function raise_ship()
-  if (ship.spr==15) then
-    sfx(1)
-    for i=0,8 do
-      if (i<3) then ship.spr = 21
-      elseif(i>5) then ship.spr = 25
-      else ship.spr = 20
-      end
-      yield()
+  sfx(1)
+  for i=0,8 do
+    if (i<3) then ship.spr = 21
+    elseif(i>5) then ship.spr = 25
+    else ship.spr = 20
     end
+    yield()
   end
 end
 
 function lower_ship()
-  local ast = get_c_ast()
-  if (ast.palette[1] ~= 3 or ast.palette[2] ~= 3 or (ast.w>0 or ast.d>0)) then
-    sfx(1)
-    for i=0,8 do
-      if (i<3) then ship.spr = 20
-      elseif (i>5) then ship.spr = 15
-      else ship.spr = 21
-      end
-      yield()
+  sfx(1)
+  for i=0,8 do
+    if (i<3) then ship.spr = 20
+    elseif (i>5) then ship.spr = 15
+    else ship.spr = 21
     end
+    yield()
   end
 end
 
@@ -392,13 +400,9 @@ end
 
 function move_ship(dir)
   m_thrust = cocreate(thrust_ship)
-  m_lower =  cocreate(lower_ship)
   while true do
     if (m_thrust and costatus(m_thrust) != "dead") then
       coresume(m_thrust,dir)
-    elseif (m_lower and costatus(m_lower) != "dead") then
-      m_thrust = nil
-      coresume(m_lower)
     else
       m_thrust = nil
       return
@@ -409,27 +413,35 @@ end
 
 function sensing_sequence()
   local ast = get_c_ast()
-  m_water =    cocreate(gather_resource)
-  m_dirt  =    cocreate(gather_resource)
-  m_elements = cocreate(sense_elements)
-  m_raise =    cocreate(raise_ship)
-  while true do
-    if (m_water and costatus(m_water) != "dead") then
-      coresume(m_water,ast,"water")
-    elseif (m_dirt and costatus(m_dirt) != "dead") then
-      m_water = nil
-      coresume(m_dirt,ast,"dirt")
-    elseif (m_elements and costatus(m_elements) != "dead") then
-      m_dirt = nil
-      coresume(m_elements,ast)
-    elseif (m_raise and costatus(m_raise) != "dead") then
-      m_elements = nil
-      coresume(m_raise)
-    else
-      m_raise = nil
-      return
+  if (
+    ast.palette[1] ~= 3 or ast.palette[2] ~= 3 or 
+    (ast.w>0 or ast.d>0)) then
+    m_lower =    cocreate(lower_ship)
+    m_water =    cocreate(gather_resource)
+    m_dirt  =    cocreate(gather_resource)
+    m_elements = cocreate(sense_elements)
+    m_raise =    cocreate(raise_ship)
+    while true do
+      if (m_lower and costatus(m_lower) != "dead") then
+        coresume(m_lower)
+      elseif (m_water and costatus(m_water) != "dead") then
+        m_lower = nil
+        coresume(m_water,ast,"water")
+      elseif (m_dirt and costatus(m_dirt) != "dead") then
+        m_water = nil
+        coresume(m_dirt,ast,"dirt")
+      elseif (m_elements and costatus(m_elements) != "dead") then
+        m_dirt = nil
+        coresume(m_elements,ast)
+      elseif (m_raise and costatus(m_raise) != "dead") then
+        m_elements = nil
+        coresume(m_raise)
+      else
+        m_raise = nil
+        return
+      end
+      yield()
     end
-    yield()
   end
 end
 
