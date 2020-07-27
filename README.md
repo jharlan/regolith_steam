@@ -19,4 +19,3 @@ The shield and fuel costs are designated as brown or blue numbers in the center 
 
 High brown numbers indicate intense solar wind.  High blue numbers indicate distant asteroids.
 
-This is an update to the version posted here:  https://www.lexaloffle.com/bbs/?tid=35489 
