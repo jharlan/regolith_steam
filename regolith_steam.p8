@@ -285,6 +285,7 @@ end
 
 function raise_ship()
   if (ship.spr==15) then
+    sfx(1)
     for i=0,8 do
       if (i<3) then ship.spr = 21
       elseif(i>5) then ship.spr = 25
@@ -297,7 +298,7 @@ end
 
 function lower_ship()
   local ast = get_c_ast()
-  if (ast) then
+  if (ast.palette[1] ~= 3 or ast.palette[2] ~= 3 or (ast.w>0 or ast.d>0)) then
     sfx(1)
     for i=0,8 do
       if (i<3) then ship.spr = 20
