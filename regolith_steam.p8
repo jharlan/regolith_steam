@@ -163,7 +163,7 @@ function move_sequence(dir)
   end
 end
 
-function sense_elements(ast)
+function gather_minerals(ast)
   if (
     not ast_log[hkey(pairing(ast.x,ast.y))] and -- have not been here before
     (ast.palette[1]!=3 or ast.palette[2]!=3)) then
@@ -174,11 +174,12 @@ function sense_elements(ast)
     local toggle=true
     tc.s0,tc.c0 = "MINING",15
 
-    for i=1,2 do
-      local vol_proxy = (i==1) and 105 or 45 --vol proxy constants
+    for i=1,2 do -- loop through primary and secondary
       local cur_mineral = ast.palette[i] 
 
       if (cur_mineral==1 or cur_mineral==2) then
+
+        local vol_proxy = (i==1) and 105 or 45 --vol proxy constants
 
         tc.c2=allp[cur_mineral]
 
@@ -189,29 +190,10 @@ function sense_elements(ast)
           tc.ac =toggle and cur_mineral or 5
           tc.s2 =(toggle and player.lvl==1) and m_names[cur_mineral] or ""
 
-          -- is mineral bin full - TODO coin flip coroutine
+          -- is mineral bin full
           if (player.sensor[cur_mineral]+ast.lower_scale*vol_proxy/delay >= 72) then
             player.sensor[cur_mineral] = 72
-
-            -- coin flipping
-            for k=1,10 do 
-              sfx(7)
-              coin.offset[cur_mineral] = k
-              coin.spr[cur_mineral][1] = 82+cur_frame%2
-              coin.spr[cur_mineral][2] = 98+cur_frame%2
-              yield()
-            end
-
-            coin.spr[cur_mineral][1],coin.spr[cur_mineral][2]=82,98
-            coin.offset[cur_mineral]=0
-
-            -- redeem coin
-            if (cur_mineral==1) then
-              player.goal_attain += 2
-            else
-              player.goal_attain += 1
-            end
-
+            redeem_coin(cur_mineral)
             -- reset sensor
             player.sensor[cur_mineral] = 0  
 
@@ -419,7 +401,7 @@ function sensing_sequence()
     m_lower =    cocreate(lower_ship)
     m_water =    cocreate(gather_resource)
     m_dirt  =    cocreate(gather_resource)
-    m_elements = cocreate(sense_elements)
+    m_minerals = cocreate(gather_minerals)
     m_raise =    cocreate(raise_ship)
     while true do
       if (m_lower and costatus(m_lower) != "dead") then
@@ -430,11 +412,11 @@ function sensing_sequence()
       elseif (m_dirt and costatus(m_dirt) != "dead") then
         m_water = nil
         coresume(m_dirt,ast,"dirt")
-      elseif (m_elements and costatus(m_elements) != "dead") then
+      elseif (m_minerals and costatus(m_minerals) != "dead") then
         m_dirt = nil
-        coresume(m_elements,ast)
+        coresume(m_minerals,ast)
       elseif (m_raise and costatus(m_raise) != "dead") then
-        m_elements = nil
+        m_minerals = nil
         coresume(m_raise)
       else
         m_raise = nil
@@ -448,6 +430,24 @@ end
 function get_toggle(tog)
   if(cur_frame%6==0) return not tog 
   return tog
+end
+
+function redeem_coin(cur_mineral)
+  -- redeem coin
+  -- coin flipping
+  for k=1,10 do 
+    sfx(7)
+    coin.offset[cur_mineral] = k
+    coin.spr[cur_mineral][1] = 82+cur_frame%2
+    coin.spr[cur_mineral][2] = 98+cur_frame%2
+  end
+  coin.spr[cur_mineral][1],coin.spr[cur_mineral][2]=82,98
+  coin.offset[cur_mineral]=0
+  if (cur_mineral==1) then
+    player.goal_attain += 2
+  else
+    player.goal_attain += 1
+  end
 end
 
 function init_move(curr_dir)
