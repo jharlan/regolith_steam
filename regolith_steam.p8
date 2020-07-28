@@ -217,32 +217,20 @@ function gather_minerals(ast)
 end
 
 function gather_resource(ast,resource)
-
-  if ((ast.w>0 and resource=="water") or (ast.d>0 and resource=="dirt")) then
-
+  if (ast[resource]>0) then
     local toggle=true
-    local sound = resource == "water" and 4 or 3
-    local delay = (player.lvl == 1 and player.move_count <10) and 42 or 15
-    local msg=(resource=="water") and {"FUEL",12,2} or {"SHIELD",4,3}
+    local sound = resource == "w" and 4 or 3
+    local msg=(resource=="w") and {"FUEL",12,2} or {"SHIELD",4,3}
     tc.s0,tc.c0,tc.c2="MINING",15,msg[2]
 
-    local dif = (player[resource]<=72) and (72-player[resource]) or 0
-
-    for i=1,delay do
+    while player[resource] <= 72 do
       toggle=get_toggle(toggle)
       tc.ac = toggle and 5 or msg[2]
       tc.s2 = (toggle and player.lvl==1) and msg[1] or ""
       sfx(sound)
-
-      if (player[resource]+dif/delay >= 72) then
-        player[resource] = 72
-        break
-      else
-        player[resource] +=dif/delay
-      end
-
+      player[resource] += 1
+      if (player[resource] == 72) break
       yield()
-
     end
 
     tc_init()
@@ -365,8 +353,8 @@ function thrust_ship(dir)
     end
     yield()
   end
-  player.dirt = (player.dirt-dd*2<0) and 0 or (player.dirt-dd*2)
-  player.water = (player.water-dw*2<0) and 0 or (player.water-dw*2)
+  player.d = (player.d-dd*2<0) and 0 or (player.d-dd*2)
+  player.w = (player.w-dw*2<0) and 0 or (player.w-dw*2)
   tc_init()
   if (assist) lines = {0,clvl.lines[player.message_index]}
   ship.x,ship.y=59,59
@@ -401,10 +389,10 @@ function sensing_sequence()
         coresume(m_lower)
       elseif (m_water and costatus(m_water) != "dead") then
         m_lower = nil
-        coresume(m_water,ast,"water")
+        coresume(m_water,ast,"w")
       elseif (m_dirt and costatus(m_dirt) != "dead") then
         m_water = nil
-        coresume(m_dirt,ast,"dirt")
+        coresume(m_dirt,ast,"d")
       elseif (m_minerals and costatus(m_minerals) != "dead") then
         m_dirt = nil
         coresume(m_minerals,ast)
@@ -428,14 +416,24 @@ end
 function redeem_coin(cur_mineral)
   -- redeem coin
   -- coin flipping
-  for k=1,10 do 
-    sfx(7)
-    coin.offset[cur_mineral] = k
-    coin.spr[cur_mineral][1] = 82+cur_frame%2
-    coin.spr[cur_mineral][2] = 98+cur_frame%2
+
+  local start_frame = cur_frame
+  local timer = 0
+
+  while timer <= 10 do 
+    if cur_frame-start_frame >= 1 then
+      start_frame = cur_frame
+      timer += 1
+      sfx(7)
+      coin.offset[cur_mineral] = timer
+      coin.spr[cur_mineral][1] = 82+timer%2 -- gold
+      coin.spr[cur_mineral][2] = 98+timer%2 -- shadow
+    end
   end
+
   coin.spr[cur_mineral][1],coin.spr[cur_mineral][2]=82,98
   coin.offset[cur_mineral]=0
+
   if (cur_mineral==1) then
     player.goal_attain += 2
   else
@@ -716,8 +714,8 @@ function level_init()
 
   player.x=px0--2000   --0
   player.y=py0--3000    --8
-  player.dirt=72
-  player.water=72
+  player.d=72 -- dirt 
+  player.w=72 -- water
   player.sensor=(player.lvl==1) and {30,30} or {2,2} 
   player.move_count=0
   player.message_index=1
@@ -731,8 +729,8 @@ end
 
 function level_over()
   local over_reason = false
-  if (player.water<=0) over_reason = "water"
-  if (player.dirt<=0) over_reason = "dirt"
+  if (player.w<=0) over_reason = "water"
+  if (player.d<=0) over_reason = "dirt"
   if (player.goal_attain>=clvl.goal) over_reason = "goal"
   if (over_reason=="goal" and player.lvl>=#lvl_list) over_reason = "win"
   return over_reason
@@ -1031,9 +1029,9 @@ function draw_vert_meters()
   printv("fuel",121,9,15,true)
 
   --water storage
-  rectfill(120,100-player.water,124,100,12) -- fill
+  rectfill(120,100-player.w,124,100,12) -- fill
   -- dirt storage
-  rectfill(114,100-player.dirt,118,100,4) -- fill
+  rectfill(114,100-player.d,118,100,4) -- fill
   -- sensor
   rectfill(2,100-player.sensor[2],6,100,10)
   rectfill(8,100-player.sensor[1],12,100,14)
