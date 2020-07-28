@@ -168,9 +168,6 @@ function gather_minerals(ast)
     not ast_log[hkey(pairing(ast.x,ast.y))] and -- have not been here before
     (ast.palette[1]!=3 or ast.palette[2]!=3)) then
 
-    local delay =
-      (player.lvl == 1 and player.move_count <10 and player.message_index<4 ) and 42 or 15
-
     local toggle=true
     tc.s0,tc.c0 = "MINING",15
 
@@ -179,27 +176,23 @@ function gather_minerals(ast)
 
       if (cur_mineral==1 or cur_mineral==2) then
 
-        local vol_proxy = (i==1) and 105 or 45 --vol proxy constants
-
         tc.c2=allp[cur_mineral]
+        local mineral_vol = ((i==1) and 105 or 45)*ast.lower_scale
+        local player_sensor = player.sensor
 
-        for j=1,delay do
+        while mineral_vol > 0 do
 
           sfx(4+cur_mineral)
           toggle=get_toggle(toggle)
           tc.ac =toggle and cur_mineral or 5
           tc.s2 =(toggle and player.lvl==1) and m_names[cur_mineral] or ""
 
-          -- is mineral bin full
-          if (player.sensor[cur_mineral]+ast.lower_scale*vol_proxy/delay >= 72) then
-            player.sensor[cur_mineral] = 72
-            redeem_coin(cur_mineral)
-            -- reset sensor
-            player.sensor[cur_mineral] = 0  
+          player_sensor[cur_mineral] += 1 
+          mineral_vol -= 1
 
-          else
-            -- increment sensor
-            player.sensor[cur_mineral]+=ast.lower_scale*vol_proxy/delay
+          if (player_sensor[cur_mineral] == 72) then
+            redeem_coin(cur_mineral)
+            player_sensor[cur_mineral] = 0  
           end
 
           yield()
