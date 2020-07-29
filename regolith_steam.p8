@@ -259,23 +259,17 @@ function move_target(dir)
   beacons.xoffset,beacons.yoffset,beacons.x,beacons.y=0,0,player.x,player.y
 end
 
-function raise_ship()
+function vert_ship()
   sfx(1)
-  for i=0,8 do
-    if (i<3) then ship.spr = 18
-    elseif(i>5) then ship.spr = 16
-    else ship.spr = 17
-    end
-    yield()
-  end
-end
-
-function lower_ship()
-  sfx(1)
-  for i=0,8 do
-    if (i<3) then ship.spr = 18
-    elseif (i>5) then ship.spr = 15
-    else ship.spr = 17
+  local start_frame = cur_frame
+  local timer = 1
+  local spr0 = ship.spr
+  local dir = spr0==16 and 1 or -1
+  while timer <= 3 do 
+    if cur_frame-start_frame >= 2 then
+      start_frame = cur_frame
+      ship.spr = spr0+timer*dir
+      timer += 1
     end
     yield()
   end
@@ -379,11 +373,11 @@ function sensing_sequence()
   if (
     ast.palette[1] ~= 3 or ast.palette[2] ~= 3 or 
     (ast.w>0 or ast.d>0)) then
-    m_lower =    cocreate(lower_ship)
+    m_lower =    cocreate(vert_ship)
     m_water =    cocreate(gather_resource)
     m_dirt  =    cocreate(gather_resource)
     m_minerals = cocreate(gather_minerals)
-    m_raise =    cocreate(raise_ship)
+    m_raise =    cocreate(vert_ship)
     while true do
       if (m_lower and costatus(m_lower) != "dead") then
         coresume(m_lower)
@@ -707,7 +701,7 @@ function level_init()
   tc={} -- center text
   tc_init()
   coin={spr={{82,98},{82,98}},offset={0,0}}
-  ship={spr=25,x=59,y=59}
+  ship={spr=16,x=59,y=59}
 
   player.x=px0--2000   --0
   player.y=py0--3000    --8
