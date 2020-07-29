@@ -229,7 +229,6 @@ function gather_resource(ast,resource)
       tc.s2 = (toggle and player.lvl==1) and msg[1] or ""
       sfx(sound)
       player[resource] += 1
-      if (player[resource] == 72) break
       yield()
     end
 
