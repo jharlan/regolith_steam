@@ -83,7 +83,6 @@ function _init()
   -- player config
   player = {}--new_3d_object()
   player.lvl,player.z=1,5.2
-  --player.z=5.2  --15
 
   -- electric gryphon config
   z_clip,z_max,k_min_x,k_max_x,k_min_y,k_max_y,k_screen_scale,k_x_center,k_y_center,k_ambient,light1_x,light1_y,light1_z,t_light_x,t_light_y,t_light_z=-3,-50,0,128,0,128,80,64,64,.4,.35,.35,.1,0,0,0
@@ -419,6 +418,7 @@ function redeem_coin(cur_mineral)
       coin.spr[cur_mineral][1] = 82+timer%2 -- gold
       coin.spr[cur_mineral][2] = 98+timer%2 -- shadow
     end
+    yield()
   end
 
   coin.spr[cur_mineral][1],coin.spr[cur_mineral][2]=82,98
