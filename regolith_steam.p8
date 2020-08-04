@@ -2,8 +2,8 @@ pico-8 cartridge // http://www.pico-8.com
 version 29
 __lua__
 
--- game: Regolith
--- author: Jason Harlan, August 2020
+-- game:   Regolith
+-- author: Jason Harlan
 
 function _update()
   if (not g_seq) then
@@ -24,11 +24,7 @@ function _draw()
 end
 
 function _init()
-
-  --globals
   cur_frame,max_sensor,mbc,px0,py0,fntspr,fntdefaultcol,fntx,fnty,ast_log,player=0,96,9,0,50,64,7,{},{},{},{lvl=1,z=5.2}
-
-  --3d library config
   z_clip,z_max,k_min_x,k_max_x,k_min_y,k_max_y,k_screen_scale,k_x_center,k_y_center,k_ambient,light1_x,light1_y,light1_z,t_light_x,t_light_y,t_light_z=-3,-50,0,128,0,128,80,64,64,.4,.35,.35,.1,0,0,0
 
   initfont()
@@ -663,7 +659,6 @@ function tc_init()
   tc.bnwv,tc.bnev,tc.bswv,tc.bsev=0,0,0,0
 end
 
---- game_sequence : active_sequence ---
 function level_init()
   purge_all=false 
   gseed = stat(95)+stat(94)+stat(93)+stat(0)
@@ -1169,7 +1164,7 @@ function creamdog_tri(x1,y1,x2,y2,x3,y3,br,pal_dist,w,d)
   return list
  end
 
----------------Electric Gryphon's 3D Library-----------------------------------------
+-------BEGIN Electric Gryphon's 3D Library---------------
 
 function get_br(nx,ny,nz)
   return band(
@@ -1565,6 +1560,8 @@ function sort2dvectors(list)
   return list
  end
 
+-------------END Electric Gryphon's 3D Library-----------------
+
 --- DATA --
 
 --static icosohedran face definition
@@ -1624,12 +1621,6 @@ sequence_config={
   restart = {"START","OVER!","        restarting!",10},
   goal = {"NEXT","LEVEL","    loading new level...",11}
 }
-
-
-
-----------------------------------END COPY-------------------------------------------------------
-----------------------------------Electric Gryphon's 3D Library----------------------------------
--------------------------------------------------------------------------------------------------
 
 
 __gfx__
