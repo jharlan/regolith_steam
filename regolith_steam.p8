@@ -90,30 +90,89 @@ function _init()
 end
 
 function game_sequence()
-  g_active = cocreate(active_sequence)
-  g_transition = cocreate(transition_sequence)
+
+  level_init() -- maybe this should be game_init?
+  g_level = cocreate(level_sequence)
+  g_cutscene = cocreate(cutscene_sequence)
+
   while true do
-    if (g_active and costatus(g_active) != "dead") then
-      coresume(g_active)
-    elseif (g_transition and costatus(g_transition) != "dead") then
-      g_active = nil
-      coresume(g_transition)
+    if (g_level and costatus(g_level) != "dead") then
+      coresume(g_level)
+    elseif (g_cutscene and costatus(g_cutscene) != "dead") then
+      g_level = nil
+      coresume(g_cutscene)
     else
-      g_transition = nil
       return
     end
     yield()
   end
 end
 
-function transition_sequence()
+function level_sequence()
+  local dir
+  local toggle=true
+  music(4)
+  s_ready = cocreate(ready_wait)
+  while not level_over() do
+
+    if (cur_frame%6==0) lines[1] += 1
+
+    if (s_ready and costatus(s_ready) != "dead") then
+      coresume(s_ready)
+    elseif (s_process and costatus(s_process) != "dead") then
+      s_ready = nil
+      coresume(s_process)
+    else
+      s_process = nil
+      s_ready = cocreate(ready_wait)
+    end
+    update_objects()
+    yield()
+  end
+end
+
+function ready_wait()
+    local toggle=true
+
+    while not s_process do
+
+      toggle=get_toggle(toggle)
+      tc.s0,tc.c0,tc.ac="READY",15,toggle and 5 or 11
+
+      if(btnp(1)) then
+        s_process = cocreate(function() move_sequence("w") end)
+      elseif(btnp(0)) then
+        s_process = cocreate(function() move_sequence("e") end)
+      elseif(btnp(3)) then
+        s_process = cocreate(function() move_sequence("n") end)
+      elseif(btnp(2)) then
+        s_process = cocreate(function() move_sequence("s") end)
+      elseif(btnp(5)) then
+        s_process = cocreate(function() return end)
+      end
+
+      yield()
+    end
+end
+
+function process_input()
+  s_process = cocreate(player.process[2])
+  while (s_process and costatus(s_process) != "dead") do
+    coresume(s_process,player.process[1][1])
+    yield()
+  end
+end
+
+function cutscene_sequence()
   local over_reason = level_over() or "restart"
   purge_all = true
   update_objects()
   local toggle,col = false,8
+
   if (over_reason == "restart" or over_reason == "goal") then
     tc.c0,tc.c2,col=15,15,10
   end
+
   if (over_reason=="win") then
     tc.c0,tc.c2=11,11
     while(not btnp(5)) do 
@@ -126,6 +185,7 @@ function transition_sequence()
     player.lvl = 1
     return
   else
+
     sfx(sequence_config[over_reason][4])
     for i=1,80 do
       toggle=get_toggle(toggle)
@@ -243,16 +303,27 @@ function gather_resource(ast,resource)
 end
 
 function move_target(dir)
+
+  tc.s0=""  
+  tc.aw,tc.ae,tc.an,tc.as=(dir=="e"),(dir=="w"),(dir=="s"),(dir=="n")
+
   local dm = {["n"]={0,-1},["e"]={1,0},["s"]={0,1},["w"]={-1,0}}
   local dx,dy=dm[dir][1],dm[dir][2]
+  local start_frame = cur_frame
+  local timer = 1
   sfx(0)
-  for i=1,8 do
-    ship.x += dx*4
-    ship.y += dy*4
-    player.x += dx*0.25
-    player.y += dy*0.25
-    beacons.xoffset += dx*3.75
-    beacons.yoffset += dy*3.75
+  --for i=1,8 do
+  while timer <= 8 do
+    if cur_frame-start_frame >=1 then
+      start_frame = cur_frame
+      ship.x += dx*4
+      ship.y += dy*4
+      player.x += dx*0.25
+      player.y += dy*0.25
+      beacons.xoffset += dx*3.75
+      beacons.yoffset += dy*3.75
+      timer += 1
+    end
     yield()
   end
   beacons.xoffset,beacons.yoffset,beacons.x,beacons.y=0,0,player.x,player.y
@@ -260,9 +331,7 @@ end
 
 function vert_ship()
   sfx(0)
-  local start_frame = cur_frame
-  local timer = 1
-  local spr0 = ship.spr
+  local start_frame,timer,spr0 = cur_frame,1,ship.spr
   local dir = spr0==16 and 1 or -1
   while timer <= 3 do 
     if cur_frame-start_frame >= 2 then
@@ -432,41 +501,7 @@ function redeem_coin(cur_mineral)
   end
 end
 
-function init_move(curr_dir)
-  tc.s0=""  
-  tc.aw,tc.ae,tc.an,tc.as=(curr_dir=="e"),(curr_dir=="w"),(curr_dir=="s"),(curr_dir=="n")
-  s_moving=cocreate(move_sequence)
-  return curr_dir
-end
 
-function active_sequence()
-  level_init()
-  local dir
-  lines = {0,clvl.lines[1]}
-  local toggle=true
-  music(4)
-  while (not level_over() and not btnp(5)) do
-    toggle=get_toggle(toggle)
-    if (cur_frame%6==0) lines[1] += 1
-    if (not s_moving) then
-      tc.s0,tc.c0,tc.ac="READY",15,toggle and 5 or 11
-      if(btnp(1))     then dir=init_move("w")
-      elseif(btnp(0)) then dir=init_move("e")
-      elseif(btnp(3)) then dir=init_move("n")
-      elseif(btnp(2)) then dir=init_move("s")
-      end
-    end
-    if (s_moving and costatus(s_moving) != "dead") then
-      coresume(s_moving,dir)
-    else
-      s_moving=nil
-    end
-    update_objects()
-    yield()
-  end
-  music(-1)
-  s_moving=nil
-end
 
 --3text by connor halford
 function initfont()
@@ -714,6 +749,7 @@ function level_init()
   player.goal_attain=0
 
   clvl=load_lvl(lvl_list[player.lvl]) -- current level
+  lines = {0,clvl.lines[1]}
 
   init_light()
   init_asteroid()   -- starting set
