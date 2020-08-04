@@ -44,13 +44,14 @@ function game_sequence()
   level_init()
   g_level = cocreate(level_sequence)
   g_cutscene = cocreate(cutscene_sequence)
+  local s,over_reason
 
   while true do
     if (g_level and costatus(g_level) != "dead") then
-      coresume(g_level)
+      s,over_reason = coresume(g_level)
     elseif (g_cutscene and costatus(g_cutscene) != "dead") then
       g_level = nil
-      coresume(g_cutscene)
+      coresume(g_cutscene,over_reason)
     else
       return
     end
@@ -59,11 +60,12 @@ function game_sequence()
 end
 
 function level_sequence()
-  local toggle=true
+  local toggle,over_reason=true
   music(4)
   s_ready = cocreate(ready_wait)
 
-  while not level_over() do
+  while not over_reason do
+    over_reason = level_over()
 
     if (cur_frame%6==0) lines[1] += 1
 
@@ -79,6 +81,7 @@ function level_sequence()
     update_objects()
     yield()
   end
+  return over_reason
 end
 
 function ready_wait()
@@ -105,8 +108,7 @@ function ready_wait()
     end
 end
 
-function cutscene_sequence()
-  local over_reason = level_over() or "restart"
+function cutscene_sequence(over_reason)
   purge_all = true
   update_objects()
   local toggle,col = false,8
