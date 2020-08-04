@@ -5,8 +5,31 @@ __lua__
 -- game: Regolith
 -- author: Jason Harlan, August 2020
 
+function _update()
+  if (not g_seq) then
+    g_seq = cocreate(game_sequence)
+  end
+  if (g_seq and costatus(g_seq) != "dead") then
+    coresume(g_seq)
+  else
+    g_seq = nil
+  end
+end
+
+function _draw()
+  cls(0)
+  cur_frame+=1
+  if(triangle_list) draw_triangle_list()
+  draw_display()
+end
+
 function _init()
-  cur_frame,max_sensor,mbc,px0,py0,fntspr,fntdefaultcol,fntx,fnty,ast_log=0,96,9,0,50,64,7,{},{},{}
+
+  --globals
+  cur_frame,max_sensor,mbc,px0,py0,fntspr,fntdefaultcol,fntx,fnty,ast_log,player=0,96,9,0,50,64,7,{},{},{},{lvl=1,z=5.2}
+
+  --3d library config
+  z_clip,z_max,k_min_x,k_max_x,k_min_y,k_max_y,k_screen_scale,k_x_center,k_y_center,k_ambient,light1_x,light1_y,light1_z,t_light_x,t_light_y,t_light_z=-3,-50,0,128,0,128,80,64,64,.4,.35,.35,.1,0,0,0
 
   initfont()
 
@@ -19,19 +42,10 @@ function _init()
   for t in all(str_to_table("@",astf)) do
     add(ast_faces,str_to_table(",",t,true))  
   end
-
-  -- player config
-  player = {}--new_3d_object()
-  player.lvl,player.z=1,5.2
-
-  -- electric gryphon config
-  z_clip,z_max,k_min_x,k_max_x,k_min_y,k_max_y,k_screen_scale,k_x_center,k_y_center,k_ambient,light1_x,light1_y,light1_z,t_light_x,t_light_y,t_light_z=-3,-50,0,128,0,128,80,64,64,.4,.35,.35,.1,0,0,0
-
 end
 
 function game_sequence()
-
-  level_init() -- maybe this should be game_init?
+  level_init()
   g_level = cocreate(level_sequence)
   g_cutscene = cocreate(cutscene_sequence)
 
@@ -49,7 +63,6 @@ function game_sequence()
 end
 
 function level_sequence()
-  local dir
   local toggle=true
   music(4)
   s_ready = cocreate(ready_wait)
@@ -243,8 +256,9 @@ function move_target(dir)
   local dx,dy=dm[dir][1],dm[dir][2]
   local start_frame = cur_frame
   local timer = 1
+
   sfx(0)
-  --for i=1,8 do
+
   while timer <= 8 do
     if cur_frame-start_frame >=1 then
       start_frame = cur_frame
@@ -432,8 +446,6 @@ function redeem_coin(cur_mineral)
     player.goal_attain += 1
   end
 end
-
-
 
 --3text by connor halford
 function initfont()
@@ -759,11 +771,11 @@ function get_c_ast()
 end
 
 function draw_display()
-    draw_message_box()
-    draw_vert_meters()
-    draw_console()
-    draw_upper()
-    draw_frame()
+  draw_message_box()
+  draw_vert_meters()
+  draw_console()
+  draw_upper()
+  draw_frame()
 end
 
 function printv(s,x0,y0,c)
@@ -905,17 +917,6 @@ end
 function draw_frame()
   fillp(0) 
 
-  --rectfill(4,103,10,123,5)
-  --rectfill(114,102,124,102,5)
-
-  --rectfill(25,3,25,13,5)
-  --rectfill(101,3,101,13,5)
-
-  --rectfill(11,115,11,125,5)
-  --rectfill(115,115,115,125,5)
-  --spr(113,3,101)
-  --spr(114,3,103)
-
   spr(115,4,103)
   spr(115,116,103)
 
@@ -924,12 +925,7 @@ function draw_frame()
 
   spr(116,4,110)
   spr(116,116,110)
-  --spr(116,4,122)
-  --spr(116,116,122)
 
-  --upper
-  --spr(116,101,-1)
-  --spr(116,19,-1)
   spr(117,16,5)
   spr(117,103,5,1,1,true,false)
 
@@ -1053,24 +1049,6 @@ function draw_vert_meters()
 
   spr(25,-1,100)
   spr(25,8,100,1,1,true)
-end
-
-function _update()
-  if (not g_seq) then
-    g_seq = cocreate(game_sequence)
-  end
-  if (g_seq and costatus(g_seq) != "dead") then
-    coresume(g_seq)
-  else
-    g_seq = nil
-  end
-end
-
-function _draw()
-  cls(0)
-  cur_frame+=1
-  if(triangle_list) draw_triangle_list()
-  draw_display()
 end
 
 function load_ast(base_object_vertices,base_object_faces,
