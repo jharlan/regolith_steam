@@ -3,67 +3,7 @@ version 29
 __lua__
 
 -- game: Regolith
--- author: personaj, March 2020
-
---static icosohedran face definition
-astf="3,7,8@8,7,2@12,1,2@1,9,2@5,10,9@9,10,8@10,4,3@11,3,4@6,12,11@12,7,11@1,6,5@6,4,5@7,3,11@7,12,2@2,9,8@10,3,8@4,6,11@1,12,6@4,10,5@1,5,9"
---- level definition ---
-lvl_list={
-  "3@".. -- level goal
-  "6@".. -- ring size
-  "2@".. -- water use upper bound : distance
-  "2@".. -- dirt use upper bound : solar wind
-  "    blue water asteroids refuel your ship...   ,"..
-  "    brown regolith asteroids fix your shields...   ,"..
-  "    yellow and pink asteroids are mined and sold for coins...   ,"..
-  "      collect coins!,"..
-  "    moving decreases fuel and shield... press arrow to continue...  @"..
-  -- first ring
-  "24,".. -- exist
-  "001,"..--"001,".. -- primary
-  "001|001|001," .. -- secondary as function of primary
-  "12341|12341|12342," .. -- volume as f(primary)
-  "10|10|09," .. -- water f(primary)
-  "10|10|10=".. --dirt as f(primary)
-  -- second ring
-  "23,".. -- exist
-  "001,".. -- primary
-  "001|001|001," .. -- secondary as function of primary
-  "12341|12311|12311," .. -- volume as f(primary)
-  "10|10|10," .. -- water f(primary)
-  "10|10|01=".. --dirt as f(primary)
-  -- third ring
-  "24,".. -- exist
-  "221,".. -- primary
-  "001|001|001," .. -- secondary as function of primary
-  "12311|12311|12311," .. -- volume as f(primary)
-  "10|10|09," .. -- water f(primary)
-  "10|20|09"
--- stepping stone easy
-,"3@3@2@2@ level loaded get mining!@14,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=41,112,111|121|111,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
--- stepping stone medium
-,"3@3@2@2@ stepping stones in space@13,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=51,332,111|111|001,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
--- stepping stone medium 2
-,"3@3@2@5@ solar storms hurt shield@13,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=51,332,111|111|001,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
--- stepping stone hard
-,"5@3@3@3@ fewer minerals more fun @13,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=51,112,111|111|001,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
--- barren stripe
-,"5@6@5@5@  so far away each rock  @13,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=51,113,111|111|001,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
-}
-
-colors = "0,0,0,1,1@0,1,1,2,2@0,1,1,3,3@0,1,1,4,4@0,0,1,5,5@0,5,5,6,6@5,5,6,7,7@0,2,2,2,2@2,2,4,4,9@1,1,1,10,10@0,1,1,3,3@0,1,1,12,12@1,1,5,5,13@1,1,2,14,14@4,4,9,9,15"
-
-allp={14,10,6}
-vols={8,13,18,23,28}
-m_names={"PINK","YELLOW"}
-sequence_config={
-  water = {"FUEL","EMPTY","        restarting!",8},
-  dirt = {"SHIELD","DOWN!","        restarting!",9},
-  restart = {"START","OVER!","        restarting!",10},
-  goal = {"NEXT","LEVEL","    loading new level...",11}
-}
-
----
+-- author: Jason Harlan, August 2020
 
 function _init()
   cur_frame,max_sensor,mbc,px0,py0,fntspr,fntdefaultcol,fntx,fnty,ast_log=0,96,9,0,50,64,7,{},{},{}
@@ -113,6 +53,7 @@ function level_sequence()
   local toggle=true
   music(4)
   s_ready = cocreate(ready_wait)
+
   while not level_over() do
 
     if (cur_frame%6==0) lines[1] += 1
@@ -155,14 +96,6 @@ function ready_wait()
     end
 end
 
-function process_input()
-  s_process = cocreate(player.process[2])
-  while (s_process and costatus(s_process) != "dead") do
-    coresume(s_process,player.process[1][1])
-    yield()
-  end
-end
-
 function cutscene_sequence()
   local over_reason = level_over() or "restart"
   purge_all = true
@@ -185,7 +118,6 @@ function cutscene_sequence()
     player.lvl = 1
     return
   else
-
     sfx(sequence_config[over_reason][4])
     for i=1,80 do
       toggle=get_toggle(toggle)
@@ -1654,6 +1586,68 @@ function sort2dvectors(list)
   end
   return list
  end
+
+--- DATA --
+
+--static icosohedran face definition
+astf="3,7,8@8,7,2@12,1,2@1,9,2@5,10,9@9,10,8@10,4,3@11,3,4@6,12,11@12,7,11@1,6,5@6,4,5@7,3,11@7,12,2@2,9,8@10,3,8@4,6,11@1,12,6@4,10,5@1,5,9"
+--- level definition ---
+lvl_list={
+  "3@".. -- level goal
+  "6@".. -- ring size
+  "2@".. -- water use upper bound : distance
+  "2@".. -- dirt use upper bound : solar wind
+  "    blue water asteroids refuel your ship...   ,"..
+  "    brown regolith asteroids fix your shields...   ,"..
+  "    yellow and pink asteroids are mined and sold for coins...   ,"..
+  "      collect coins!,"..
+  "    moving decreases fuel and shield... press arrow to continue...  @"..
+  -- first ring
+  "24,".. -- exist
+  "001,"..--"001,".. -- primary
+  "001|001|001," .. -- secondary as function of primary
+  "12341|12341|12342," .. -- volume as f(primary)
+  "10|10|09," .. -- water f(primary)
+  "10|10|10=".. --dirt as f(primary)
+  -- second ring
+  "23,".. -- exist
+  "001,".. -- primary
+  "001|001|001," .. -- secondary as function of primary
+  "12341|12311|12311," .. -- volume as f(primary)
+  "10|10|10," .. -- water f(primary)
+  "10|10|01=".. --dirt as f(primary)
+  -- third ring
+  "24,".. -- exist
+  "221,".. -- primary
+  "001|001|001," .. -- secondary as function of primary
+  "12311|12311|12311," .. -- volume as f(primary)
+  "10|10|09," .. -- water f(primary)
+  "10|20|09"
+-- stepping stone easy
+,"3@3@2@2@ level loaded get mining!@14,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=41,112,111|121|111,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
+-- stepping stone medium
+,"3@3@2@2@ stepping stones in space@13,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=51,332,111|111|001,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
+-- stepping stone medium 2
+,"3@3@2@5@ solar storms hurt shield@13,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=51,332,111|111|001,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
+-- stepping stone hard
+,"5@3@3@3@ fewer minerals more fun @13,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=51,112,111|111|001,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
+-- barren stripe
+,"5@6@5@5@  so far away each rock  @13,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=51,113,111|111|001,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
+}
+
+colors = "0,0,0,1,1@0,1,1,2,2@0,1,1,3,3@0,1,1,4,4@0,0,1,5,5@0,5,5,6,6@5,5,6,7,7@0,2,2,2,2@2,2,4,4,9@1,1,1,10,10@0,1,1,3,3@0,1,1,12,12@1,1,5,5,13@1,1,2,14,14@4,4,9,9,15"
+
+allp={14,10,6}
+vols={8,13,18,23,28}
+m_names={"PINK","YELLOW"}
+sequence_config={
+  water = {"FUEL","EMPTY","        restarting!",8},
+  dirt = {"SHIELD","DOWN!","        restarting!",9},
+  restart = {"START","OVER!","        restarting!",10},
+  goal = {"NEXT","LEVEL","    loading new level...",11}
+}
+
+
 
 ----------------------------------END COPY-------------------------------------------------------
 ----------------------------------Electric Gryphon's 3D Library----------------------------------
