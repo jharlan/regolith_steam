@@ -40,6 +40,66 @@ function _init()
   end
 end
 
+Beacon={}
+function Beacon:new(x,y,config)
+  --[[ 
+  coord%4  1  3  1  3
+        
+    coord  1  3  5  7
+         1 d  w  d  w
+         3 w  d  w  d
+         5 d  w  d  w
+  --]]
+  self.__index=self
+  srand(abs(pairing(x,y))+config.seed)
+  local beacon_type = (x%4==y%4) and "distance" or "weather"
+  local o={
+    x=x,
+    y=y,
+    color=(beacon_type=="distance") and 12 or 4,
+    value=ceil(rnd(config[beacon_type]))+1,
+  }
+  setmetatable(o,self)
+  return o
+end
+
+Target={}
+function Target:new()
+  self.__index=self
+  local o= {
+    -- display arrow?
+    an=true,
+    aw=true,
+    as=true,
+    ae=true,
+    -- arrow colors TODO - make dual colors for draw
+    ac=5,
+    -- strings
+    s0="",
+    s2="",
+    -- string colors
+    c0=8,
+    c2=8,
+    -- ship
+    ship_x=59,
+    ship_y=59,
+    ship_spr=16,
+    -- beacon info TODO move this
+    bnw=false,
+    bne=false,
+    bsw=false,
+    bse=false,
+    bc=6, -- color of beacon background
+    bnwv=0,
+    bnev=0,
+    bswv=0,
+    bsev=0
+  }
+  setmetatable(o,self)
+  return o
+end
+
+
 function game_sequence()
   level_init()
   g_level = cocreate(level_sequence)
@@ -146,16 +206,12 @@ end
 function move_sequence(dir)
   spawn_belt(dir)
   m_target  = cocreate(move_target)
-  m_move    = cocreate(move_ship)
   s_sensing = cocreate(sensing_sequence)
   while true do
     if (m_target and costatus(m_target) != "dead") then
       coresume(m_target,dir)
-    elseif (m_move and costatus(m_move) != "dead") then
-      m_target = nil
-      coresume(m_move,dir)
     elseif (s_sensing and costatus(s_sensing) != "dead") then
-      m_move = nil
+      m_target = nil
       coresume(s_sensing)
     else
       s_sensing = nil
@@ -204,7 +260,7 @@ function gather_minerals(ast)
       yield()
     end
 
-    tc_init()
+    tc=Target:new()
 
     if (player.lvl == 1 and player.message_index == 3) then
       player.message_index=4
@@ -235,7 +291,7 @@ function gather_resource(ast,resource)
       yield()
     end
 
-    tc_init()
+    tc=Target:new()
 
     if (player.lvl == 1 and player.message_index == msg[3]-1) then
       player.message_index=msg[3]
@@ -246,41 +302,124 @@ function gather_resource(ast,resource)
 end
 
 function move_target(dir)
+  --[[   
+  beacon grid
+    asteroids appear at uppercase letter
+    beacons appear at alternating lowercase w and d
+
+     3  4  5  6  7  8  9
+     |  Ʌ  |  Ʌ  |  Ʌ  |
+  3--w--|--d--|--w--|--d--
+     |  V  |  V  |  V  |
+  4 <-> A <-> B <-> C <->
+     |  Ʌ  |  Ʌ  |  Ʌ  |
+  5--d--|--w--|--d--|--w--
+     |  V  |  V  |  V  |
+  6 <-> D <->[E]<-> F <->
+     |  Ʌ  |  Ʌ  |  Ʌ  |
+  7--w--|--d--|--w--|--d--
+     |  V  |  V  |  V  |
+  8 <-> G <-> H <-> I <->
+     |  Ʌ  |  Ʌ  |  Ʌ  |
+  9--d--|--w--|--d--|--w--
+     |  V  |  V  |  V  |
+
+  --]]
 
   tc.s0=""  
   tc.aw,tc.ae,tc.an,tc.as=(dir=="e"),(dir=="w"),(dir=="s"),(dir=="n")
 
-  local dm = {["n"]={0,-1},["e"]={1,0},["s"]={0,1},["w"]={-1,0}}
-  local dx,dy=dm[dir][1],dm[dir][2]
-  local start_frame = cur_frame
-  local timer = 1
+  local dtb={n=3,w=1,s=2,e=0} -- dir to button translate
+  local dir_vector = {n={0,-1},e={1,0},s={0,1},w={-1,0}}
+  local dx,dy=dir_vector[dir][1],dir_vector[dir][2]
+
+  local assist=(player.lvl==1 and player.move_count<3)
+
+  local start_frame=cur_frame
+  local timer=1
+  local toggle=true
 
   sfx(0)
-
+  printh("before while : "..new_beacons.xoffset)
   while timer <= 8 do
     if cur_frame-start_frame >=1 then
-      start_frame = cur_frame
-      ship.x += dx*4
-      ship.y += dy*4
-      player.x += dx*0.25
-      player.y += dy*0.25
-      beacons.xoffset += dx*3.75
-      beacons.yoffset += dy*3.75
-      timer += 1
+      start_frame=cur_frame
+
+      tc.ship_x+=dx*4
+      tc.ship_y+=dy*4
+
+      player.x+=dx*0.25
+      player.y+=dy*0.25
+
+      new_beacons.xoffset+=dx*3.75
+      new_beacons.yoffset+=dy*3.75
+
+      timer+=1
     end
     yield()
   end
-  beacons.xoffset,beacons.yoffset,beacons.x,beacons.y=0,0,player.x,player.y
+
+  -- thrust ship portion
+  timer=1
+  start_frame=cur_frame
+  while timer<=16 do
+    if cur_frame-start_frame >=1 then 
+      start_frame=cur_frame
+      if (timer==9) then
+        sfx(2)
+        -- relevant beacons
+
+        if (assist) then
+          tc.s0,tc.s2,tc.c0,tc.c2,lines="MOVE","COST",15,15,{0,clvl.lines[5]}
+          while (not btnp(dtb[dir])) do
+            toggle=get_toggle(toggle)
+            tc.ac = toggle and 5 or 11
+            yield()
+          end
+          sfx(0)
+        end
+      end
+
+      if (timer==10) tc.s0,tc.s2="",""
+
+      tc.ship_x-=dx*2
+      tc.ship_y-=dy*2
+      timer+=1
+    end 
+    yield()
+  end
+
+  -- decrement move cost
+  -- decrement move cost
+  --player.d=(player.d-dd*2<0) and 0 or (player.d-dd*2)
+  --player.w=(player.w-dw*2<0) and 0 or (player.w-dw*2)
+  tc=Target:new()
+
+  if (assist) lines={0,clvl.lines[player.message_index]}
+
+  --init beacons -- TODO move to object
+  new_beacons={
+    xoffset=0, -- for drawing
+    yoffset=0
+  }
+
+  for i=1,11,2 do
+      new_beacons[i]={}
+    for j=1,11,2 do
+      new_beacons[i][j]=Beacon:new(i+player.x-6,j+player.y-6,clvl)
+    end
+  end 
+
 end
 
 function vert_ship()
   sfx(0)
-  local start_frame,timer,spr0 = cur_frame,1,ship.spr
+  local start_frame,timer,spr0 = cur_frame,1,tc.ship_spr
   local dir = spr0==16 and 1 or -1
   while timer <= 3 do 
     if cur_frame-start_frame >= 2 then
       start_frame = cur_frame
-      ship.spr = spr0+timer*dir
+      tc.ship_spr = spr0+timer*dir
       timer += 1
     end
     yield()
@@ -296,88 +435,6 @@ end
 
 function move_value(is_brown,ast_nb)
   return is_brown and ast_nb[2] or ast_nb[1]
-end
-
-function thrust_ship(dir)
-  local dtb={n=3,w=1,s=2,e=0} -- dir to button translate
-  local ship_mag,init_ship,steps=2,ship.spr,16
-  local toggle=true
-  local dw,dd=0,0 -- decrements
-  local assist=(player.lvl==1 and player.move_count<3)
-  ship.thrust=true
-
-  for i=1,steps do
-    toggle=get_toggle(toggle)
-
-    tc.ac = toggle and 5 or 11
-
-    if (i==9) then
-
-      if(assist) tc.s0,tc.s2,tc.c0,tc.c2,lines="MOVE","COST",15,15,{0,clvl.lines[5]}
-      sfx(2)
-
-      if (dir=="w") then
-        tc.bnw,tc.bsw=true,true
-        dw = tc.bnwb and tc.bswv or tc.bnwv -- if upper left is brown sw is blue
-        dd = tc.bnwb and tc.bnwv or tc.bswv
-      elseif(dir=="e") then
-        tc.bne,tc.bse=true,true
-        dw = tc.bnwb and tc.bnev or tc.bsev
-        dd = tc.bnwb and tc.bsev or tc.bnev
-      elseif(dir=="s")then
-        tc.bsw,tc.bse=true,true
-        dw = tc.bnwb and tc.bswv or tc.bsev
-        dd = tc.bnwb and tc.bsev or tc.bswv
-      elseif(dir=="n")then
-        tc.bnw,tc.bne=true,true
-        dw = tc.bnwb and tc.bnev or tc.bnwv
-        dd = tc.bnwb and tc.bnwv or tc.bnev
-      end
-
-      if(assist) then
-        while (not btnp(dtb[dir])) do
-          toggle=get_toggle(toggle)
-          tc.ac = toggle and 5 or 11
-          yield()
-        end
-        sfx(0)
-      end
-
-    elseif(i>8) then
-      tc.s0=""
-      tc.s2=""
-    end
-
-    if (dir=="n") then
-      ship.y += ship_mag
-    elseif (dir=="e") then
-      ship.x -= ship_mag
-    elseif (dir=="s") then
-      ship.y -= ship_mag
-    elseif (dir=="w") then
-      ship.x += ship_mag
-    end
-    yield()
-  end
-  player.d = (player.d-dd*2<0) and 0 or (player.d-dd*2)
-  player.w = (player.w-dw*2<0) and 0 or (player.w-dw*2)
-  tc_init()
-  if (assist) lines = {0,clvl.lines[player.message_index]}
-  ship.x,ship.y=59,59
-  ship.thrust = false
-end
-
-function move_ship(dir)
-  m_thrust = cocreate(thrust_ship)
-  while true do
-    if (m_thrust and costatus(m_thrust) != "dead") then
-      coresume(m_thrust,dir)
-    else
-      m_thrust = nil
-      return
-    end
-    yield()
-  end
 end
 
 function sensing_sequence()
@@ -503,8 +560,8 @@ function load_lvl(enc_lvl)
 
   rt.goal=tonum(temp_t[1])
   rt.ring_size=tonum(temp_t[2])
-  rt.dist_ub=tonum(temp_t[3]) 
-  rt.weather_ub=tonum(temp_t[4])
+  rt.distance=tonum(temp_t[3]) 
+  rt.weather=tonum(temp_t[4])
   rt.lines=str_to_table(",",temp_t[5])
 
   local rings_t=str_to_table("=",temp_t[6])
@@ -651,34 +708,15 @@ function gafc(xp,y)-- get_addr_from_coord(x,y)
   return 0x6000+64*y+xp
 end
 
-function tc_init()
-  tc.an,tc.aw,tc.as,tc.ae=true,true,true,true -- arrows
-  tc.ac=5 -- arrow colors
-  tc.s0,tc.s2="",""-- strings
-  tc.c0,tc.c2=8,8 -- string color
-  tc.bnw,tc.bne,tc.bsw,tc.bse=false,false,false,false -- active beacon backgrounds
-  tc.bc=6 -- color of beacon background
-  tc.bnwv,tc.bnev,tc.bswv,tc.bsev=0,0,0,0
-end
-
 function level_init()
   purge_all=false 
-  gseed = stat(95)+stat(94)+stat(93)+stat(0)
+  gseed=stat(95)+stat(94)+stat(93)+stat(0)
 
   -- global objects --
-  ast_list={}    -- stores asteroid belt
-  ast_log={}     -- which asteroids have been mined/sold
-  beacons={
-    xoffset=0,
-    yoffset=0,
-    x=px0,
-    y=py0
-  }
-  lines={}  -- console content
-  tc={} -- center text
-  tc_init()
+
+  tc=Target:new() -- center text
+  
   coin={spr={{82,98},{82,98}},offset={0,0}}
-  ship={spr=16,x=59,y=59}
 
   player.x=px0--2000   --0
   player.y=py0--3000    --8
@@ -690,9 +728,29 @@ function level_init()
   player.goal_attain=0
 
   clvl=load_lvl(lvl_list[player.lvl]) -- current level
+  clvl.seed=gseed 
+
+  new_beacons={
+    xoffset=0, -- for drawing
+    yoffset=0  
+  }
+
+  -- TODO - put into beacons object and init
+  for i=1,11,2 do
+      new_beacons[i]={}
+    for j=1,11,2 do
+      new_beacons[i][j]=Beacon:new(i+player.x-6,j+player.y-6,clvl)
+    end
+  end 
+
+  lines={}  -- console content
   lines = {0,clvl.lines[1]}
 
   init_light()
+
+  ast_list={}    -- stores asteroid belt
+  ast_log={}     -- which asteroids have been mined/sold
+  -- TODO pass in clvl
   init_asteroid()   -- starting set
 end
 
@@ -770,8 +828,8 @@ end
 function draw_display()
   draw_message_box()
   draw_vert_meters()
-  draw_console()
   draw_upper()
+  draw_console()
   draw_frame()
 end
 
@@ -806,84 +864,48 @@ function draw_target()
   if(tc.ae) spr(7,69,61,1,1,true,false) -- east
   pal()
 
-  local ulx,uly=-13+flr(beacons.xoffset),-13+flr(beacons.yoffset)
-  pal(8,5)
-  for xi=0,5 do
-    for yi=0,5 do
-
-      spr(1,ulx+xi*30,uly+yi*30+1) -- 1,false,false
-      spr(1,ulx+xi*30-5,uly+yi*30+1-5,1,1,true,true)
-
-      spr(3,ulx+xi*30+1,uly+yi*30+8)
-      spr(3,ulx+xi*30+1,uly+yi*30-10)
-
-      spr(4,ulx+xi*30+7,uly+yi*30+2)
-      spr(4,ulx+xi*30+7-18,uly+yi*30+2)
-
-    end
-  end
-  pal()
-
   if(tc.s0!="") then
-    rectfill(ship.x-#tc.s0*2+5,ship.y-3,ship.x-#tc.s0*2+4+#tc.s0*4,ship.y+1,1)
-    print(tc.s0,ship.x-#tc.s0*2+5,ship.y-4,tc.c0)
+    rectfill(tc.ship_x-#tc.s0*2+5,tc.ship_y-3,tc.ship_x-#tc.s0*2+4+#tc.s0*4,tc.ship_y+1,1)
+    print(tc.s0,tc.ship_x-#tc.s0*2+5,tc.ship_y-4,tc.c0)
   end
+
   if(tc.s2!="") then
-    rectfill(ship.x-#tc.s2*2+5,ship.y+11,ship.x-#tc.s2*2+4+#tc.s2*4,ship.y+15,1)
-    print(tc.s2,ship.x-#tc.s2*2+5,ship.y+10,tc.c2)
+    rectfill(tc.ship_x-#tc.s2*2+5,tc.ship_y+11,tc.ship_x-#tc.s2*2+4+#tc.s2*4,tc.ship_y+15,1)
+    print(tc.s2,tc.ship_x-#tc.s2*2+5,tc.ship_y+10,tc.c2)
   end
-  spr(ship.spr,ship.x,ship.y+2,1,1)
+
+  spr(tc.ship_spr,tc.ship_x,tc.ship_y+2,1,1)
 end
 
 -- cost beacons
 function draw_beacon_nums()
-  local ulx,uly=-13+flr(beacons.xoffset),-13+flr(beacons.yoffset)
-  local init_brown=true
-  if (beacons.x%4 == beacons.y%4) then
-    init_brown=false
-  end
-  local nc
-  local ast_nb=nil
-  local assist=(player.lvl==1 and player.move_count<=3)
-  local toggle=get_toggle(true)
-  local bx,by
-  for xi=0,5 do
-    init_brown = not init_brown
-    for yi=0,5 do
-      init_brown = not init_brown
-      -- get weather and distance
-      srand(abs(pairing(beacons.x+2*2-xi*2,beacons.y+3*2-yi*2))+gseed)
-      ast_nb={ceil(rnd(clvl.dist_ub))+1,ceil(rnd(clvl.weather_ub))+1}
+  local x0,y0 = flr(new_beacons.xoffset)+2,flr(new_beacons.yoffset)+2
 
-      tc.bnwb=init_brown -- is upper left brown -- so many hacks :(
-      if (toggle) pal(7,8)
-      bx,by=ulx+xi*30-3,uly+yi*30-1
-      if(yi==3 and xi==3) then 
-        bkg_move_cost(bx,by,tc.bse)
-        tc.bsev = move_value(init_brown,ast_nb)
-      elseif(yi==2 and xi==2) then
-        bkg_move_cost(bx,by,tc.bnw)
-        tc.bnwv = move_value(init_brown,ast_nb)
-      elseif(yi==2 and xi==3) then
-        bkg_move_cost(bx,by,tc.bne)
-        tc.bnev = move_value(init_brown,ast_nb)
-      elseif(yi==3 and xi==2) then 
-        bkg_move_cost(bx,by,tc.bsw)
-        tc.bswv = move_value(init_brown,ast_nb)
-      end
+  for col=1,11,2 do
+    -- beacon
+    for row=1,11,2 do
+      local beacon=new_beacons[col][row]
+      print(
+        beacon.value,
+        x0+col*15,
+        y0+row*15,
+        beacon.color
+      )
+      -- change color because of ship here
+
+      printh("player : "..player.x..","..player.y.."|"..
+      "beacon : "..beacon.x..","..beacon.y.."|"..
+      "ship : "..tc.ship_x..","..tc.ship_y)
+      spr(1,x0+col*15-5,y0+row*15+1-5,1,1,true,true)
+      spr(1,x0+col*15,y0+row*15+1)
+
+      pal(8,5)
+      spr(3,x0+col*15+1,y0+row*15+8)
+      spr(3,x0+col*15+1,y0+row*15-10)
+      spr(4,x0+col*15+7,y0+row*15+2)
+      spr(4,x0+col*15-11,y0+row*15+2)
+
       pal()
-
-      if (init_brown) then
-        print(
-        ast_nb[2],
-        ulx+xi*30,
-        uly+yi*30,4)
-      else
-        print(
-        ast_nb[1],
-        ulx+xi*30,
-        uly+yi*30,12)
-      end
     end
   end
 end
@@ -914,14 +936,24 @@ end
 function draw_frame()
   fillp(0) 
 
-  spr(115,4,103)
-  spr(115,116,103)
+  --spr(115,4,103)
+  --spr(115,116,103)
 
-  spr(114,3,117)
-  spr(114,116,117,1,1,true,false) 
+  --spr(114,1,117)
+  --spr(114,118,117,1,1,true,false) 
 
-  spr(116,4,110)
-  spr(116,116,110)
+  --spr(119,0,116)
+  --spr(119,119,116,1,1,true,false)
+
+  --spr(118,0,112)
+  --spr(118,0,118)
+  --spr(118,116,110)
+  --spr(118,116,120)
+
+  spr(88,111,104,2,3)
+  spr(88,0,104,2,3,true,false)
+
+		--line(36,127,90,127,5)
 
   spr(117,16,5)
   spr(117,103,5,1,1,true,false)
@@ -978,10 +1010,10 @@ function draw_console()
   -- second interface line
   cy += 6
   print("  \151restart",36,cy,13)
-  spr(24,115,121)
-  spr(24,115,112,1,1,false,true)
-  spr(24,4,121,1,1,true)
-  spr(24,4,112,1,1,true,true)
+  --spr(24,115,121)
+  --spr(24,115,112,1,1,false,true)
+  --spr(24,4,121,1,1,true)
+  --spr(24,4,112,1,1,true,true)
 end
 
 function draw_upper()
@@ -1222,9 +1254,11 @@ function set_radius(object)
   object.radius=sqrt(object.radius)
 end
 
+--[[
 function delete_object(object)
   del(ast_list,object)
 end
+--]]
 
 function new_triangle(p1x,p1y,p2x,p2y,p3x,p3y,z,c1,pal_dist)
   add(triangle_list,
@@ -1634,13 +1668,13 @@ __gfx__
 000000005d5000000000000000000000000000000000000000000000007000000750570000000000000000000000000000000000000000000000000000000000
 00000000050000000000000080000000000000000000000000000000000000000075700000000000000000000000000000000000000000000000000000000000
 00000000050000000000000000000000000000000000000000077700000000000007000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000500050000500000000000000000000dd00000000000000000000000000000dd000000000
-000bb300000000000000000000000000000000000000000000000000500050000550000000055555000000550005000000000000000500000000055000000000
-000bb3000000000000000000000000000000000000000000000000005505500005d0000000005d5000015155000d000000015150000d00000000055000000000
-000bb30000000000000000000000000000000000000000000000000005650000055000000000000005dd1005001d100005dd1000001d10000000050000000000
-00bb33300003b0000000000000000000000000000000000000000000056500000500000000000000000151550051500000015150005150000000055000000000
-00b333300003b0000000000000000000000000000000000000000000005000000000000000000000000000550010100000000000001010000000055000000000
-0b3000330003b0000000b00000000000000000000000000000000000000000000000000000000000000000dd55505550000000000050500000000dd055505550
+0000000000000000000000000000000000000000000000000000000050005000050000000000000000000dd1000500000000000000000000000001dd00000000
+000bb30000000000000000000000000000000000000000000000000050005000055000000005555500000551000d000000000000000500000000015500000000
+000bb3000000000000000000000000000000000000000000000000005505500005d0000000005d5000151551d01d10d000015150000d00000000015500000000
+000bb3000000000000000000000000000000000000000000000000000565000005500000000000005dd100505051505005dd1000001d10000000005000000000
+00bb33300003b0000000000000000000000000000000000000000000056500000500000000000000001515510010100000015150005150000000015500000000
+00b333300003b00000000000000000000000000000000000000000000050000000000000000000000000055105ddd50000000000001010000000015500000000
+0b3000330003b0000000b0000000000000000000000000000000000000000000000000000000000000000dd1050005000000000000505000000001dd55505550
 0000000000300b000000b00000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -1666,30 +1700,37 @@ __gfx__
 77777707777700777077700777700707070000007007007077007707070000777700000007000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000a9000000990000000700000007000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00aa79000007a0000007790000007000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00aa79000007a000000aa9000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000a900000099000000aa9000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000900000009000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00055000000550000000500000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00555500000550000005550000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00555500000550000005550000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00055000000550000005550000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000500000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000770000000d0000000000005050500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00777700000ddd000000550000555000005550000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000
-0777777000ddddd00000500000ddd000000d00000300dd5500000000000000000000000000000000000000000000000000000000000000000000000000000000
-777007770ddddddd00005500000d0000003d0000223dddd100000000000000000000000000000000000000000000000000000000000000000000000000000000
-77700777ddddddd000005000000d0000000300000300dd5500000000000000000000000000000000000000000000000000000000000000000000000000000000
-077777700ddddd0000000500000d0000000d30000000000500000000000000000000000000000000000000000000000000000000000000000000000000000000
-0077770000ddd0000000000000ddd000000d30000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000000d00000000000000555000000d30000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000005d5d5d5d5d500000000000000000008c8c8c8c8c8c8c80000000000000000
+000a900000099000000070000000700000000000000000000000000000000000000050505050500000000000000000000c000000e000005c0000000000000000
+00aa79000007a0000007790000007000000000000000000000000000000000000005050505050500000000000000000008000000000000080000000000000000
+00aa79000007a000000aa9000000a00000000000000000000000000000000000000050505050500000000000000000000c0000000000000c0000000000000000
+000a900000099000000aa9000000a000000000000000000000000000000000000005050505050500000000000000000008000000000000080000000000000000
+0000000000000000000090000000900000000000000000000000000000000000000050505050500000000000000000000c0000000000000c0000000000000000
+00000000000000000000000000000000000000000000000000000000000000000005050505050500000000000000000008000000000000080000000000000000
+0000000000000000000000000000000000000000000000000000000000000000000050505050500000000000000000000c0000000000000c0000000000000000
+00000000000000000000000000000000000000000000000000000000000000000005050505050500000000000000000008000000000000080000000000000000
+0005500000055000000050000000500000000000000000000000000000000000000dd0505050500000000000000000000c0000000000000c0000000000000000
+00555500000550000005550000005000000000000000000000000000000000000000050505050500000000000000000008000000000000080000000000000000
+0055550000055000000555000000500000000000000000000000000000000000000005505050500000000000000000000c0000000000000c0000000000000000
+00055000000550000005550000005000000000000000000000000000000000000000050505050500000000000000000008000000000000080000000000000000
+000000000000000000005000000050000000000000000000000000000000000000000d505050500000000000000000000c0000000000000c0000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000050505050500000000000000000008000000000000080000000000000000
+000000000000000000000000000000000000000000000000000000000000000000000d505050500000000000000000000c0000000000000c0000000000000000
+000770000000d00000000000050505000000000000000000000000000000000000000d0505050500000000000000000008000000000000080000000000000000
+00777700000ddd0000000000005550000055500000000005000000000500000000000d505050500000000000000000000c0000000000000c0000000000000000
+0777777000ddddd00050005000ddd000000d00000300dd5500000000050000000000050505050500000000000000000008000000000000080000000000000000
+777007770ddddddd00005055000d0000003d0000223dddd1000050500500000000000d505050500000000000000000000c0000000000000c0000000000000000
+77700777ddddddd000500050000d0000000300000300dd5500050005550000000000050505050500000000000000000008000000000000080000000000000000
+077777700ddddd0000000000000d0000000d3000000000050000000005000000000005505050500000000000000000000c0000000000000c0000000000000000
+0077770000ddd0000000000000ddd000000d30000000000000050005050000000000050505050500000000000000000008000000000000080000000000000000
+00077000000d00000000000000555000000d3000000000000000505005000000555555555555555000000000000000000c8c8c8c8c8c8c8c0000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000050505050500000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000005050505050000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000505050500000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000005050505050000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000505050500000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000050505050000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000005050500000000000000000000000000000000000000000000000000
 __sfx__
 010500000c614000000e6140c6110c615000000c61425600256001060012600056000a60005600046000360003600026000160001600006000060000600006000000000000000000000000000000000000000000
 000400000700006650040000363002000016100130000000000003400035000370003700000000000002730029300000000000000000000000000000000000000000000000000000000000000000000000000000
