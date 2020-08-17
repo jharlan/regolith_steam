@@ -63,8 +63,23 @@ function Beacon:new(x,y,config)
   return o
 end
 
+function spawn_beacons(x,y,config)
+  local imap = {[1]=13,[3]=11,[5]=9,[7]=7,[9]=5,[11]=3,[13]=1}
+  local b={
+    xoffset=0, -- for drawing
+    yoffset=0
+  }
+  for i,vx in pairs(imap) do
+      b[i]={}
+    for j,vy in pairs(imap) do
+      b[i][j]=Beacon:new(vx+x-8,vy+y-8,config)
+    end
+  end 
+  return b
+end
+
 Target={}
-function Target:new()
+function Target:new(ship_spr)
   self.__index=self
   local o= {
     -- display arrow?
@@ -83,17 +98,7 @@ function Target:new()
     -- ship
     ship_x=59,
     ship_y=59,
-    ship_spr=16,
-    -- beacon info TODO move this
-    bnw=false,
-    bne=false,
-    bsw=false,
-    bse=false,
-    bc=6, -- color of beacon background
-    bnwv=0,
-    bnev=0,
-    bswv=0,
-    bsev=0
+    ship_spr=ship_spr or 16
   }
   setmetatable(o,self)
   return o
@@ -260,7 +265,7 @@ function gather_minerals(ast)
       yield()
     end
 
-    tc=Target:new()
+    tc=Target:new(tc.ship_spr)
 
     if (player.lvl == 1 and player.message_index == 3) then
       player.message_index=4
@@ -273,6 +278,27 @@ function gather_minerals(ast)
   if (ast.d>0) pal_dist[4]=4
   ast.pal_dist = build_dist(pal_dist) 
   ast_log[hkey(pairing(ast.x,ast.y))] = true
+end
+
+function toggle_beacons(dir,toggle)
+  -- possibly determine coords first so can toggle and return
+  if (dir=="e") then -- ship moving west
+    -- crossing col 5
+    new_beacons[5][5].toggle=toggle
+    new_beacons[5][7].toggle=toggle
+  elseif (dir=="w") then -- ship moving east
+    -- crossing col 7
+    new_beacons[7][5].toggle=toggle
+    new_beacons[7][7].toggle=toggle
+  elseif (dir=="s") then -- ship moving north
+    -- crossing row 5
+    new_beacons[5][5].toggle=toggle
+    new_beacons[7][5].toggle=toggle
+  elseif (dir=="n") then -- ship moving south
+    -- crossing row 7
+    new_beacons[5][7].toggle=toggle
+    new_beacons[7][7].toggle=toggle
+  end
 end
 
 function gather_resource(ast,resource)
@@ -291,7 +317,7 @@ function gather_resource(ast,resource)
       yield()
     end
 
-    tc=Target:new()
+    tc=Target:new(tc.ship_spr)
 
     if (player.lvl == 1 and player.message_index == msg[3]-1) then
       player.message_index=msg[3]
@@ -340,7 +366,6 @@ function move_target(dir)
   local toggle=true
 
   sfx(0)
-  printh("before while : "..new_beacons.xoffset)
   while timer <= 8 do
     if cur_frame-start_frame >=1 then
       start_frame=cur_frame
@@ -363,24 +388,28 @@ function move_target(dir)
   timer=1
   start_frame=cur_frame
   while timer<=16 do
+    toggle=get_toggle(toggle)
     if cur_frame-start_frame >=1 then 
       start_frame=cur_frame
+      if (timer==8) toggle_beacons(dir,true)
       if (timer==9) then
         sfx(2)
-        -- relevant beacons
-
         if (assist) then
           tc.s0,tc.s2,tc.c0,tc.c2,lines="MOVE","COST",15,15,{0,clvl.lines[5]}
           while (not btnp(dtb[dir])) do
             toggle=get_toggle(toggle)
+            toggle_beacons(dir,toggle)
             tc.ac = toggle and 5 or 11
             yield()
           end
           sfx(0)
         end
+        toggle_beacons(dir,nil)
       end
-
-      if (timer==10) tc.s0,tc.s2="",""
+      if (timer==10) then
+        tc.s0,tc.s2="",""
+        toggle_beacons(dir,true)
+      end
 
       tc.ship_x-=dx*2
       tc.ship_y-=dy*2
@@ -393,29 +422,15 @@ function move_target(dir)
   -- decrement move cost
   --player.d=(player.d-dd*2<0) and 0 or (player.d-dd*2)
   --player.w=(player.w-dw*2<0) and 0 or (player.w-dw*2)
-  tc=Target:new()
-
+  tc=Target:new(tc.ship_spr)
   if (assist) lines={0,clvl.lines[player.message_index]}
-
-  --init beacons -- TODO move to object
-  new_beacons={
-    xoffset=0, -- for drawing
-    yoffset=0
-  }
-
-  for i=1,11,2 do
-      new_beacons[i]={}
-    for j=1,11,2 do
-      new_beacons[i][j]=Beacon:new(i+player.x-6,j+player.y-6,clvl)
-    end
-  end 
-
+  new_beacons=spawn_beacons(player.x,player.y,clvl)
 end
 
 function vert_ship()
   sfx(0)
   local start_frame,timer,spr0 = cur_frame,1,tc.ship_spr
-  local dir = spr0==16 and 1 or -1
+  local dir=spr0==16 and 1 or -1
   while timer <= 3 do 
     if cur_frame-start_frame >= 2 then
       start_frame = cur_frame
@@ -730,18 +745,7 @@ function level_init()
   clvl=load_lvl(lvl_list[player.lvl]) -- current level
   clvl.seed=gseed 
 
-  new_beacons={
-    xoffset=0, -- for drawing
-    yoffset=0  
-  }
-
-  -- TODO - put into beacons object and init
-  for i=1,11,2 do
-      new_beacons[i]={}
-    for j=1,11,2 do
-      new_beacons[i][j]=Beacon:new(i+player.x-6,j+player.y-6,clvl)
-    end
-  end 
+  new_beacons=spawn_beacons(player.x,player.y,clvl)
 
   lines={}  -- console content
   lines = {0,clvl.lines[1]}
@@ -880,31 +884,27 @@ end
 -- cost beacons
 function draw_beacon_nums()
   local x0,y0 = flr(new_beacons.xoffset)+2,flr(new_beacons.yoffset)+2
-
-  for col=1,11,2 do
+  for col=1,13,2 do
     -- beacon
-    for row=1,11,2 do
+    for row=1,13,2 do
       local beacon=new_beacons[col][row]
+      -- number
       print(
         beacon.value,
-        x0+col*15,
-        y0+row*15,
+        x0+col*15-30,
+        y0+row*15-30,
         beacon.color
       )
-      -- change color because of ship here
-
-      printh("player : "..player.x..","..player.y.."|"..
-      "beacon : "..beacon.x..","..beacon.y.."|"..
-      "ship : "..tc.ship_x..","..tc.ship_y)
-      spr(1,x0+col*15-5,y0+row*15+1-5,1,1,true,true)
-      spr(1,x0+col*15,y0+row*15+1)
-
+      -- ring
+      if (beacon.toggle) pal(5,8)
+      spr(1,x0+col*15-5-30,y0+row*15+1-5-30,1,1,true,true)
+      spr(1,x0+col*15-30,y0+row*15+1-30)
+      -- edge
       pal(8,5)
-      spr(3,x0+col*15+1,y0+row*15+8)
-      spr(3,x0+col*15+1,y0+row*15-10)
-      spr(4,x0+col*15+7,y0+row*15+2)
-      spr(4,x0+col*15-11,y0+row*15+2)
-
+      spr(3,x0+col*15+1-30,y0+row*15+8-30)
+      spr(3,x0+col*15+1-30,y0+row*15-10-30)
+      spr(4,x0+col*15+7-30,y0+row*15+2-30)
+      spr(4,x0+col*15-11-30,y0+row*15+2-30)
       pal()
     end
   end
