@@ -56,8 +56,9 @@ function Beacon:new(x,y,config)
   local o={
     x=x,
     y=y,
-    color=(beacon_type=="distance") and 12 or 4,
-    value=ceil(rnd(config[beacon_type]))+1,
+    color=(x%4==y%4) and 12 or 4,
+    t=(x%4==y%4) and "w" or "d",
+    value=ceil(rnd(config[beacon_type]))+1
   }
   setmetatable(o,self)
   return o
@@ -301,6 +302,26 @@ function toggle_beacons(dir,toggle)
   end
 end
 
+function decrement_resources(dir)
+   if (dir=="e") then -- ship moving west
+    -- crossing col 5
+    player[new_beacons[5][5].t]-=new_beacons[5][5].value*2
+    player[new_beacons[5][7].t]-=new_beacons[5][7].value*2
+  elseif (dir=="w") then -- ship moving east
+    -- crossing col 7
+    player[new_beacons[7][5].t]-=new_beacons[7][5].value*2
+    player[new_beacons[7][7].t]-=new_beacons[7][7].value*2
+  elseif (dir=="s") then -- ship moving north
+    -- crossing row 5
+    player[new_beacons[5][5].t]-=new_beacons[5][5].value*2
+    player[new_beacons[7][5].t]-=new_beacons[7][5].value*2
+  elseif (dir=="n") then -- ship moving south
+    -- crossing row 7
+    player[new_beacons[5][7].t]-=new_beacons[5][7].value*2
+    player[new_beacons[7][7].t]-=new_beacons[7][7].value*2
+  end 
+end
+
 function gather_resource(ast,resource)
   if (ast[resource]>0) then
     local toggle=true
@@ -404,6 +425,7 @@ function move_target(dir)
           end
           sfx(0)
         end
+        decrement_resources(dir)
         toggle_beacons(dir,nil)
       end
       if (timer==10) then
