@@ -57,7 +57,7 @@ function Beacon:new(x,y,config)
     x=x,
     y=y,
     color=(x%4==y%4) and 12 or 4,
-    t=(x%4==y%4) and "w" or "d",
+    t=(x%4==y%4) and "w" or "d", -- resource impacted; water or dirt
     value=ceil(rnd(config[beacon_type]))+1
   }
   setmetatable(o,self)
@@ -440,10 +440,6 @@ function move_target(dir)
     yield()
   end
 
-  -- decrement move cost
-  -- decrement move cost
-  --player.d=(player.d-dd*2<0) and 0 or (player.d-dd*2)
-  --player.w=(player.w-dw*2<0) and 0 or (player.w-dw*2)
   tc=Target:new(tc.ship_spr)
   if (assist) lines={0,clvl.lines[player.message_index]}
   new_beacons=spawn_beacons(player.x,player.y,clvl)
@@ -461,17 +457,6 @@ function vert_ship()
     end
     yield()
   end
-end
-
-function bkg_move_cost(x,y,show)
-  if (show) then
-    spr(6,x,y)
-    spr(6,x+1,y-1,1,1,true,true)
-  end
-end
-
-function move_value(is_brown,ast_nb)
-  return is_brown and ast_nb[2] or ast_nb[1]
 end
 
 function sensing_sequence()
