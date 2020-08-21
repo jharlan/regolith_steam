@@ -128,21 +128,29 @@ end
 function level_sequence()
   local toggle,over_reason=true
   music(4)
-  s_ready = cocreate(ready_wait)
+  local ready = cocreate(ready_wait)
+  local process
+  local dispatch={
+    ["ra"]=function() move_sequence("w") end,
+    ["la"]=function() move_sequence("e") end,
+    ["da"]=function() move_sequence("n") end,
+    ["ua"]=function() move_sequence("s") end,
+    ["x"]=function() return end 
+  }
 
   while not over_reason do
     over_reason = level_over()
 
     if (cur_frame%6==0) lines[1] += 1
 
-    if (s_ready and costatus(s_ready) != "dead") then
-      coresume(s_ready)
-    elseif (s_process and costatus(s_process) != "dead") then
-      s_ready = nil
-      coresume(s_process)
+    if (ready and costatus(ready) != "dead") then
+      _,process=coresume(ready,dispatch)
+    elseif (process and costatus(process) != "dead") then
+      ready = nil
+      coresume(process)
     else
-      s_process = nil
-      s_ready = cocreate(ready_wait)
+      process = nil
+      ready = cocreate(ready_wait)
     end
     update_objects()
     yield()
@@ -150,62 +158,92 @@ function level_sequence()
   return over_reason
 end
 
-function ready_wait()
-    local toggle=true
+function ready_wait(dispatch)
+    local p
 
-    while not s_process do
-
-      toggle=get_toggle(toggle)
-      tc.s0,tc.c0,tc.ac="READY",15,toggle and 5 or 11
-
-      if(btnp(1)) then
-        s_process = cocreate(function() move_sequence("w") end)
-      elseif(btnp(0)) then
-        s_process = cocreate(function() move_sequence("e") end)
-      elseif(btnp(3)) then
-        s_process = cocreate(function() move_sequence("n") end)
-      elseif(btnp(2)) then
-        s_process = cocreate(function() move_sequence("s") end)
-      elseif(btnp(5)) then
-        s_process = cocreate(function() return end)
+    while not p do
+      if(btnp(1) and dispatch["ra"]) then
+        p = cocreate(dispatch["ra"])
+      elseif(btnp(0) and dispatch["la"]) then
+        p = cocreate(dispatch["la"])
+      elseif(btnp(3) and dispatch["da"]) then
+        p = cocreate(dispatch["da"])
+      elseif(btnp(2) and dispatch["ua"]) then
+        p = cocreate(dispatch["ua"])
+      elseif(btnp(5) and dispatch["x"]) then
+        p = cocreate(dispatch["x"])
       end
-
       yield()
     end
+    return p
+end
+
+function cutscene(over_reason)
+
+  purge_all = true
+  update_objects()
+
+  local toggle=false
+
+  -- interface changes
+  tc.c0,
+  tc.c2,
+
+  tc.ac=15,15,10
+  tc.ac = toggle and 5 or col 
+
+  tc.s0 = toggle and "YOU" or ""
+  tc.s0=sequence_config[over_reason][1]
+
+  tc.s2 = toggle and "WIN!" or ""
+  tc.s2=sequence_config[over_reason][2]
+
+  lines = {0,"     congratulations!"}
+  lines = {0,sequence_config[over_reason][3]}
+
+  sfx(sequence_config[over_reason][4])
+
+  if (over_reason == "restart") then -- TODO change restart to restart level
+
+  elseif (over_reason == "goal") then
+
+    player.lvl =player.lvl+1
+
+  elseif (over_reason=="win") then
+
+    player.lvl = 1
+
+  elseif (over_reason=="dirt") then
+  -- animate explosion
+   
+
+  elseif (over_reason=="water") then
+  -- animate drifting
+
+  end
 end
 
 function cutscene_sequence(over_reason)
-  purge_all = true
-  update_objects()
-  local toggle,col = false,8
-
-  if (over_reason == "restart" or over_reason == "goal") then
-    tc.c0,tc.c2,col=15,15,10
-  end
-
-  if (over_reason=="win") then
-    tc.c0,tc.c2=11,11
-    while(not btnp(5)) do 
-      toggle=get_toggle(toggle)
-      tc.s0 = toggle and "YOU" or ""
-      tc.s2 = toggle and "WIN!" or ""
-      lines = {0,"     congratulations!"}
-      yield()
+  local scene=cocreate(cutscene)
+  local ready=cocreate(ready_wait)
+  local process
+  local dispatch = {
+    ["x"]=function() return end
+  }
+    
+  while true do
+    if (scene and costatus(scene) != "dead") then
+      coresume(scene,over_reason)
+    elseif (ready and costatus(ready) != "dead") then
+      scene=nil
+      _,process=coresume(ready,dispatch) -- TODO alter expected methods
+    elseif (process and costatus(process) != "dead") then
+      ready=nil 
+      coresume(process) 
+    else
+      return 
     end
-    player.lvl = 1
-    return
-  else
-    sfx(sequence_config[over_reason][4])
-    for i=1,80 do
-      toggle=get_toggle(toggle)
-      tc.ac = toggle and 5 or col 
-      tc.s0=sequence_config[over_reason][1]
-      tc.s2=sequence_config[over_reason][2]
-      lines = {0,sequence_config[over_reason][3]}
-      yield()
-    end
-    player.lvl = (over_reason == "goal") and (player.lvl+1) or 1
-    return
+    yield()
   end
 end
 
@@ -742,8 +780,8 @@ function level_init()
 
   player.x=px0--2000   --0
   player.y=py0--3000    --8
-  player.d=72 -- dirt 
-  player.w=72 -- water
+  player.d=7--2 -- dirt 
+  player.w=7--2 -- water
   player.sensor=(player.lvl==1) and {30,30} or {2,2} 
   player.move_count=0
   player.message_index=1
