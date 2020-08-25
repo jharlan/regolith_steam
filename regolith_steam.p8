@@ -199,10 +199,11 @@ function cutscene(over_reason)
   elseif (over_reason == "goal") then
     --sfx(14)
     -- screen wipe
-    lines = {0,"     level complete!!!",11,"  \151continue"}
+    lines={0,"     level complete!!!",11,"  \151continue"}
     player.lvl =player.lvl+1
 
   elseif (over_reason=="win") then
+    lines={0,"        you win!!!",7}
     player.lvl = 1
 
   elseif (over_reason=="dirt") then
