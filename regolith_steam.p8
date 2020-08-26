@@ -179,7 +179,7 @@ end
 
 function cutscene(over_reason)
 
-  purge_all = true -- remove asteroids
+  purge_all=true -- remove asteroids
   update_objects()
 
   -- nil target
@@ -228,7 +228,7 @@ function cutscene(over_reason)
       tc.ship_x+=ship_dir[1]
       tc.ship_y+=ship_dir[2]
       --tc.ship_spr=32+timer-1
-        lines = {0,"       fuel empty!!!",8}
+        lines={0,"       fuel empty!!!",8}
         timer+=1        
       end
       yield()
@@ -793,8 +793,8 @@ function level_init()
   player.x=px0--2000   --0
   player.y=py0--3000    --8
   player.d=72--2 -- dirt 
-  player.w=27--72--2 -- water
-  player.sensor={70,70}--(player.lvl==1) and {30,30} or {2,2} 
+  player.w=72--72--2 -- water
+  player.sensor=(player.lvl==1) and {30,30} or {2,2} 
   player.move_count=0
   player.message_index=1
   player.goal_attain=0
@@ -805,7 +805,7 @@ function level_init()
   new_beacons=spawn_beacons(player.x,player.y,clvl)
 
   lines={}  -- console content
-  lines = {0,clvl.lines[1]}
+  lines={0,clvl.lines[1]}
 
   init_light()
 
@@ -937,7 +937,6 @@ function draw_beacon_nums()
     for row=1,13,2 do
       local beacon=new_beacons[col][row]
       if (beacon.toggle) then
-        --spr(9,x0+col*15-30-1,y0+row*15-30-2)
         pal(3,8)
       end
       -- ring
@@ -996,24 +995,8 @@ end
 function draw_frame()
   fillp(0) 
 
-  --spr(115,4,103)
-  --spr(115,116,103)
-
-  --spr(114,1,117)
-  --spr(114,118,117,1,1,true,false) 
-
-  --spr(119,0,116)
-  --spr(119,119,116,1,1,true,false)
-
-  --spr(118,0,112)
-  --spr(118,0,118)
-  --spr(118,116,110)
-  --spr(118,116,120)
-
   spr(88,111,104,2,3)
   spr(88,0,104,2,3,true,false)
-
-		--line(36,127,90,127,5)
 
   spr(117,16,5)
   spr(117,103,5,1,1,true,false)
@@ -1022,8 +1005,6 @@ function draw_frame()
 
   spr(26,107,31)
   spr(30,119,31)
-
-  --spr(28,107,61)
 
   spr(26,107,91)
   spr(30,119,91)
@@ -1037,21 +1018,19 @@ function draw_frame()
   spr(30,0,91,1,1,true)
 
   spr(27,30,13,1,1,false,true)
-  --spr(29,60,13,1,1,false,true)
   spr(27,90,13,1,1,false,true)
 
   spr(27,30,108)
- -- spr(29,60,108)
   spr(27,90,108)
 end
 
 -- prints contents of the global lines
 function draw_console()
-  local cy = 115
-  local raw_text = lines[2]
-  local ti = lines[1]
-  local cursor = 1
-  local buffer = ""
+  local cy=115
+  local raw_text=lines[2]
+  local ti=lines[1]
+  local cursor=1
+  local buffer=""
 
   -- first line that can horiz scroll
   if (#raw_text>25) then
@@ -1068,12 +1047,8 @@ function draw_console()
   print(buffer,12,cy,lines[3] or 15)
 
   -- second interface line
-  cy += 6
+  cy +=6
   print(lines[4] or "  \151restart",36,cy,13)
-  --spr(24,115,121)
-  --spr(24,115,112,1,1,false,true)
-  --spr(24,4,121,1,1,true)
-  --spr(24,4,112,1,1,true,true)
 end
 
 function draw_upper()
@@ -1313,12 +1288,6 @@ function set_radius(object)
   end
   object.radius=sqrt(object.radius)
 end
-
---[[
-function delete_object(object)
-  del(ast_list,object)
-end
---]]
 
 function new_triangle(p1x,p1y,p2x,p2y,p3x,p3y,z,c1,pal_dist)
   add(triangle_list,
