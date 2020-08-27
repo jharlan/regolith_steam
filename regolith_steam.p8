@@ -127,7 +127,7 @@ end
 
 function level_sequence()
   local toggle,over_reason=true
-  music(4)
+  --music(4)
   local ready = cocreate(ready_wait)
   local process
   local dispatch={
@@ -380,7 +380,7 @@ function gather_resource(ast,resource)
     local msg=(resource=="w") and {"FUEL",12,2} or {"SHIELD",4,3}
     tc.s0,tc.c0,tc.c2="MINING",15,msg[2]
 
-    while player[resource] <= 72 do
+    while player[resource] <= 68 do
       toggle=get_toggle(toggle)
       tc.ac = toggle and 5 or msg[2]
       tc.s2 = (toggle and player.lvl==1) and msg[1] or ""
@@ -792,9 +792,9 @@ function level_init()
 
   player.x=px0--2000   --0
   player.y=py0--3000    --8
-  player.d=72--2 -- dirt 
-  player.w=72--72--2 -- water
-  player.sensor=(player.lvl==1) and {30,30} or {2,2} 
+  player.d=68--2 -- dirt 
+  player.w=68--72--2 -- water
+  player.sensor=(player.lvl==1) and {68,68} or {2,2} 
   player.move_count=0
   player.message_index=1
   player.goal_attain=0
@@ -888,8 +888,9 @@ end
 
 function draw_display()
   draw_message_box()
-  draw_vert_meters()
   draw_upper()
+
+  draw_vert_meters()
   draw_console()
   draw_frame()
 end
@@ -903,7 +904,7 @@ end
 function draw_goal()
   for i=0,clvl.goal-1 do
     local gspr = (player.goal_attain-i > 0) and 98 or 82
-    spr(gspr,67+i*4,8)
+    spr(gspr,67+i*4+2,9)
   end
 end
 
@@ -994,113 +995,24 @@ end
 
 function draw_frame()
   fillp(0) 
+--[[
+  -- new interior edges
+  rectfill(14,35,14,93,6) -- vert
+  rectfill(111,15,112,113,6) 
+  rectfill(14,15,112,15,6) -- horiz
+  rectfill(14,113,112,113,6)
+  -- new outer edges
+  rectfill(0,31,0,97,6)
+  rectfill(126,31,126,97,6)
 
-  spr(88,111,104,2,3)
-  spr(88,0,104,2,3,true,false)
-
-  spr(117,16,5)
-  spr(117,103,5,1,1,true,false)
-
-  -- latches
-
-  spr(26,107,31)
-  spr(30,119,31)
-
-  spr(26,107,91)
-  spr(30,119,91)
-
-  spr(26,12,31,1,1,true)
-  spr(30,0,31,1,1,true)
-  
---  spr(28,12,61,1,1,true)
-
-  spr(26,12,91,1,1,true)
-  spr(30,0,91,1,1,true)
-
-  spr(27,30,13,1,1,false,true)
-  spr(27,90,13,1,1,false,true)
-
-  spr(27,30,108)
-  spr(27,90,108)
-end
-
--- prints contents of the global lines
-function draw_console()
-  local cy=115
-  local raw_text=lines[2]
-  local ti=lines[1]
-  local cursor=1
-  local buffer=""
-
-  -- first line that can horiz scroll
-  if (#raw_text>25) then
-    while cursor < 27 do
-      buffer = buffer .. sub(raw_text,ti%#raw_text+1,ti%#raw_text+1)
-      ti += 1
-      cursor += 1
-    end
-  else
-    buffer=raw_text 
-  end
-  print("88888888888888888888888888",12,cy,1)
-  print("88888888888888888888888888",12,cy+6,1)
-  print(buffer,12,cy,lines[3] or 15)
-
-  -- second interface line
-  cy +=6
-  print(lines[4] or "  \151restart",36,cy,13)
-end
-
-function draw_upper()
-  print("8888888888888888888",26,3,1)
-  print("8888888888888888888",26,9,1)
-  print(" level",26,3,8)
-  print(" "..tostr(player.lvl).." of "..tostr(#lvl_list),26,9,15)
-  print("goal",70,3,8)
-  draw_goal()
-
-  -- market caps
+--]]
+  --
+--[[
+  -- caps
   spr(24,101,9)
   spr(24,101,0,1,1,false,true)
   spr(24,18,9,1,1,true)
   spr(24,18,0,1,1,true,true)
-
-end
-
-function draw_vert_meters()
-  for i=0,18 do
-    spr(5,2,27+i*4)
-    spr(5,8,27+i*4)
-    spr(5,114,27+i*4)
-    spr(5,120,27+i*4)
-  end
-
-  fillp(0b1111000011110000.1)
-  
-  printv("shield",116,2,player.d>16 and 2 or 8)
-  printv("shield",115,1,15)
-
-  printv("fuel",122,10,player.w>16 and 2 or 8)
-  printv("fuel",121,9,15)
-
-  --water storage
-  rectfill(120,100-player.w,124,100,12) -- fill
-  -- dirt storage
-  rectfill(114,100-player.d,118,100,4) -- fill
-  -- sensor
-  rectfill(2,100-player.sensor[2],6,100,10)
-  rectfill(8,100-player.sensor[1],12,100,14)
-
-  -- coins
-  spr(coin.spr[2][2],1,19-coin.offset[2])
-  spr(coin.spr[2][1],0,18-coin.offset[2])
-
-  -- pink
-  spr(coin.spr[1][2],7,19-coin.offset[1])
-  spr(coin.spr[1][1],6,18-coin.offset[1])
-
-  spr(coin.spr[1][2],7,13-coin.offset[1])
-  spr(coin.spr[1][1],6,12-coin.offset[1])
 
   spr(25,111,21,1,1,false,true)
   spr(25,120,21,1,1,true,true)
@@ -1113,6 +1025,114 @@ function draw_vert_meters()
 
   spr(25,-1,100)
   spr(25,8,100,1,1,true)
+
+--]]
+
+--[[
+
+  --ornaments
+  spr(88,111,104,2,3)
+  spr(88,0,104,2,3,true,false)
+
+  spr(117,16,5)
+  spr(117,103,5,1,1,true,false)
+
+--]]
+
+  -- latches
+--[[
+  spr(26,107,31)
+  spr(30,119,31)
+
+  spr(26,107,91)
+  spr(30,119,91)
+
+  spr(26,12,31,1,1,true)
+  spr(30,0,31,1,1,true)
+  
+  spr(26,12,91,1,1,true)
+  spr(30,0,91,1,1,true)
+
+  spr(27,30,13,1,1,false,true)
+  spr(27,90,13,1,1,false,true)
+
+  spr(27,30,108)
+  spr(27,90,108)
+--]]
+
+end
+
+-- prints contents of the global lines
+function draw_console()
+  local cy=114
+  local raw_text=lines[2]
+  local ti=lines[1]
+  local cursor=1
+  local buffer=""
+
+  -- first line that can horiz scroll
+  if (#raw_text>29) then
+    while cursor < 31 do
+      buffer = buffer .. sub(raw_text,ti%#raw_text+1,ti%#raw_text+1)
+      ti += 1
+      cursor += 1
+    end
+  else
+    buffer=raw_text 
+  end
+  print("888888888888888888888888888888",4,cy,1)
+  print("888888888888888888888888888888",4,cy+6,1)
+  print(buffer,4,cy,lines[3] or 15)
+
+  -- second interface line
+  cy +=6
+  print(lines[4] or "  \151restart",36,cy,13)
+end
+
+function draw_upper()
+  print("888888888888888888888888888888",4,4,1)
+  print("888888888888888888888888888888",4,10,1)
+  print(" level",28,4,8)
+  print(" "..tostr(player.lvl).." of "..tostr(#lvl_list),28,10,15)
+  print("goal",72,4,8)
+  draw_goal()
+
+end
+
+function draw_vert_meters()
+  for i=-2,20 do
+    spr(5,4,27+i*4)
+    spr(5,10,27+i*4)
+    spr(5,112,27+i*4)
+    spr(5,118,27+i*4)
+  end
+
+  fillp(0b1111000011110000.1)
+  
+  --printv("shield",114,20,player.d>16 and 2 or 8)
+  printv("shield",113,19,15)
+
+  --printv("fuel",120,10,player.w>16 and 2 or 8)
+  printv("fuel",119,27,15)
+
+  --water storage
+  rectfill(118,110-player.w,122,110,12) -- fill
+  -- dirt storage
+  rectfill(112,110-player.d,116,110,4) -- fill
+  -- sensor
+  rectfill(4,110-player.sensor[2],8,110,10)
+  rectfill(10,110-player.sensor[1],14,110,14)
+
+  -- coins
+  --spr(coin.spr[2][2],1,19-coin.offset[2])
+  spr(coin.spr[2][1],2,35-coin.offset[2])
+
+  -- pink
+  --spr(coin.spr[1][2],7,19-coin.offset[1])
+  spr(coin.spr[1][1],8,35-coin.offset[1])
+
+  --spr(coin.spr[1][2],7,13-coin.offset[1])
+  spr(coin.spr[1][1],8,27-coin.offset[1])
 end
 
 function load_ast(base_object_vertices,base_object_faces,
