@@ -11,6 +11,7 @@ function _update()
   end
   if (g_seq and costatus(g_seq) != "dead") then
     coresume(g_seq)
+    update_objects()
   else
     g_seq = nil
   end
@@ -71,7 +72,7 @@ function spawn_beacons(x,y,config)
     yoffset=0
   }
   for i,vx in pairs(imap) do
-      b[i]={}
+    b[i]={}
     for j,vy in pairs(imap) do
       b[i][j]=Beacon:new(vx+x-8,vy+y-8,config)
     end
@@ -108,16 +109,15 @@ end
 
 function game_sequence()
   level_init()
-  g_level = cocreate(level_sequence)
-  g_cutscene = cocreate(cutscene_sequence)
-  local s,over_reason
-
+  local level=cocreate(level_processor)
+  local cutscene=cocreate(cutscene_sequence)
+  local over_reason
   while true do
-    if (g_level and costatus(g_level) != "dead") then
-      s,over_reason = coresume(g_level)
-    elseif (g_cutscene and costatus(g_cutscene) != "dead") then
-      g_level = nil
-      coresume(g_cutscene,over_reason)
+    if (level and costatus(level) != "dead") then
+      _,over_reason=coresume(level)
+    elseif (cutscene and costatus(cutscene) != "dead") then
+      level=nil
+      coresume(cutscene,over_reason)
     else
       return
     end
@@ -125,56 +125,71 @@ function game_sequence()
   end
 end
 
-function level_sequence()
-  local toggle,over_reason=true
-  --music(4)
-  local ready = cocreate(ready_wait)
-  local process
-  local dispatch={
-    ["ra"]=function() move_sequence("w") end,
-    ["la"]=function() move_sequence("e") end,
-    ["da"]=function() move_sequence("n") end,
-    ["ua"]=function() move_sequence("s") end,
-    ["x"]=function() return end 
-  }
+function level_processor()
+  local over_reason
 
+  local target=cocreate(target_process)
+  local ship=cocreate(ship_process)
+  
+  TASKS={}
+  INPUT_LOCK=nil
+  
   while not over_reason do
-    over_reason = level_over()
+    over_reason=level_over()
 
-    if (cur_frame%6==0) lines[1] += 1
+    coresume(target)
+    coresume(ship)
 
-    if (ready and costatus(ready) != "dead") then
-      _,process=coresume(ready,dispatch)
-    elseif (process and costatus(process) != "dead") then
-      ready = nil
-      coresume(process)
-    else
-      process = nil
-      ready = cocreate(ready_wait)
-    end
-    update_objects()
     yield()
   end
   return over_reason
 end
 
-function ready_wait(dispatch)
-    local p
-    while not p do
-      if(btnp(1) and dispatch["ra"]) then
-        p = cocreate(dispatch["ra"])
-      elseif(btnp(0) and dispatch["la"]) then
-        p = cocreate(dispatch["la"])
-      elseif(btnp(3) and dispatch["da"]) then
-        p = cocreate(dispatch["da"])
-      elseif(btnp(2) and dispatch["ua"]) then
-        p = cocreate(dispatch["ua"])
-      elseif(btnp(5) and dispatch["x"]) then
-        p = cocreate(dispatch["x"])
-      end
-      yield()
+function ship_process()
+  local ready=cocreate(ready_wait_work)
+  local process
+  while true do
+    if (ready and costatus(ready) != "dead") then
+      _,process=coresume(ready)
+    elseif (process and costatus(process) != "dead") then
+      ready=nil
+      coresume(process)
+    else
+      process=nil
+      ready=cocreate(ready_wait_work)
     end
-    return p
+    yield()
+  end
+end
+
+function ready_wait_work()
+  local task
+  while not task do
+    task=dequeue(TASKS)
+    yield()
+  end
+  return cocreate(function() mine_sequence(task) end)
+end
+
+function ready_wait_input(dispatch)
+  local p
+  while not p do
+    if not INPUT_LOCK then
+      if(btnp(1) and dispatch["ra"]) then
+        p=cocreate(dispatch["ra"])
+      elseif(btnp(0) and dispatch["la"]) then
+        p=cocreate(dispatch["la"])
+      elseif(btnp(3) and dispatch["da"]) then
+        p=cocreate(dispatch["da"])
+      elseif(btnp(2) and dispatch["ua"]) then
+        p=cocreate(dispatch["ua"])
+      elseif(btnp(5) and dispatch["x"]) then
+        p=cocreate(dispatch["x"])
+      end
+    end
+    yield()
+  end
+  return p
 end
 
 function cutscene(over_reason)
@@ -189,7 +204,7 @@ function cutscene(over_reason)
   local timer=1
   local start_frame=cur_frame
 
-  local ship_dir = {
+  local ship_dir={
     ((59-tc.ship_x)<0 and -1 or ((59-tc.ship_x)==0 and 0 or 1)),
     ((59-tc.ship_y)<0 and -1 or ((59-tc.ship_y)==0 and 0 or 1))
   }
@@ -204,7 +219,7 @@ function cutscene(over_reason)
 
   elseif (over_reason=="win") then
     lines={0,"        you win!!!",7}
-    player.lvl = 1
+    player.lvl=1
 
   elseif (over_reason=="dirt") then
     sfx(12)
@@ -214,7 +229,7 @@ function cutscene(over_reason)
       tc.ship_x+=ship_dir[1] 
       tc.ship_y+=ship_dir[2]
       tc.ship_spr=32+timer-1
-        lines = {0,"     shields down!!!",8}
+        lines={0,"     shields down!!!",8}
         timer+=1        
       end
       yield()
@@ -238,9 +253,9 @@ end
 
 function cutscene_sequence(over_reason)
   local scene=cocreate(cutscene)
-  local ready=cocreate(ready_wait)
+  local ready=cocreate(ready_wait_input)
   local process
-  local dispatch = {
+  local dispatch={
     ["x"]=function() return end
   }
     
@@ -260,18 +275,19 @@ function cutscene_sequence(over_reason)
   end
 end
 
-function move_sequence(dir)
-  spawn_belt(dir)
-  m_target  = cocreate(move_target)
-  s_sensing = cocreate(sensing_sequence)
+function mine_sequence(task)
+  local thrust=cocreate(thrust_ship)
+  local mining=cocreate(sensing_sequence)
   while true do
-    if (m_target and costatus(m_target) != "dead") then
-      coresume(m_target,dir)
-    elseif (s_sensing and costatus(s_sensing) != "dead") then
-      m_target = nil
-      coresume(s_sensing)
+    if (thrust and costatus(thrust) != "dead") then
+      coresume(thrust,task.dir)
+   elseif (mining and costatus(mining) != "dead") then
+      thrust=nil
+      INPUT_LOCK=nil
+      coresume(mining)
     else
-      s_sensing = nil
+     -- thrust=nil
+      mining=nil
       player.move_count +=1
       return
     end
@@ -389,6 +405,8 @@ function gather_resource(ast,resource)
       yield()
     end
 
+    if bp then player[resource]=68 end
+
     tc=Target:new(tc.ship_spr)
 
     if (player.lvl == 1 and player.message_index == msg[3]-1) then
@@ -399,7 +417,105 @@ function gather_resource(ast,resource)
   end
 end
 
-function move_target(dir)
+enqueue=add
+function dequeue(queue)
+  local v = queue[1]
+  del(queue, v)
+  return v
+end
+
+function target_process()
+  local ready=cocreate(ready_wait_input)
+  local process
+  local dispatch={
+    ["ra"]=function() target_working("w") end,
+    ["la"]=function() target_working("e") end,
+    ["da"]=function() target_working("n") end,
+    ["ua"]=function() target_working("s") end,
+    ["x"]=function() return end 
+  }
+  while true do
+    if (ready and costatus(ready) != "dead") then
+      _,process=coresume(ready,dispatch)
+    elseif (process and costatus(process) != "dead") then
+      ready=nil
+      coresume(process)
+    else
+      process=nil
+      ready=cocreate(ready_wait_input)
+    end
+    yield()
+  end
+end
+
+function target_task(ast,dir)
+  local task={}
+  task.dir=dir
+  if ast then 
+    task.w=ast.w
+    task.d=ast.d
+    task[14],task[10]=0,0
+    if (not ast_log[hkey(pairing(ast.x,ast.y))]) then
+      for i=1,2 do 
+        if (ast.palette[i]!=3) then -- ignore grey
+          task[allp[ast.palette[i]]]+=((i==1) and 105 or 45)*ast.lower_scale
+        end
+      end
+    end
+  end
+  return task
+end
+
+function target_working(dir)
+  spawn_belt(dir)
+  tc.s0=""  
+  tc.aw,tc.ae,tc.an,tc.as=(dir=="e"),(dir=="w"),(dir=="s"),(dir=="n")
+
+  local dtb={n=3,w=1,s=2,e=0} -- dir to button translate
+  local dir_vector = {n={0,-1},e={1,0},s={0,1},w={-1,0}}
+  local dx,dy=dir_vector[dir][1],dir_vector[dir][2]
+
+  local assist=(player.lvl==1 and player.move_count<3)
+
+  local start_frame=cur_frame
+  local timer=1
+  local toggle=true
+
+  -- 1. set input lock
+  INPUT_LOCK=true
+
+  sfx(0)
+
+  -- 2. move target
+  while timer <= 8 do
+    if cur_frame-start_frame >=1 then
+      start_frame=cur_frame
+
+      tc.ship_x+=dx*4
+      tc.ship_y+=dy*4
+
+      player.x+=dx*0.25
+      player.y+=dy*0.25
+
+      new_beacons.xoffset+=dx*3.75
+      new_beacons.yoffset+=dy*3.75
+
+      timer+=1
+    end
+    yield()
+  end
+
+  -- 3. add task
+  enqueue(TASKS,target_task(get_c_ast(),dir))
+
+  -- 4. wait for lock to release
+  while INPUT_LOCK do
+    yield()
+  end
+
+end
+
+function thrust_ship(dir)
   --[[   
   beacon grid
     asteroids appear at uppercase letter
@@ -424,8 +540,10 @@ function move_target(dir)
 
   --]]
 
+--[[
   tc.s0=""  
   tc.aw,tc.ae,tc.an,tc.as=(dir=="e"),(dir=="w"),(dir=="s"),(dir=="n")
+--]]
 
   local dtb={n=3,w=1,s=2,e=0} -- dir to button translate
   local dir_vector = {n={0,-1},e={1,0},s={0,1},w={-1,0}}
@@ -436,25 +554,6 @@ function move_target(dir)
   local start_frame=cur_frame
   local timer=1
   local toggle=true
-
-  sfx(0)
-  while timer <= 8 do
-    if cur_frame-start_frame >=1 then
-      start_frame=cur_frame
-
-      tc.ship_x+=dx*4
-      tc.ship_y+=dy*4
-
-      player.x+=dx*0.25
-      player.y+=dy*0.25
-
-      new_beacons.xoffset+=dx*3.75
-      new_beacons.yoffset+=dy*3.75
-
-      timer+=1
-    end
-    yield()
-  end
 
   -- thrust ship portion
   timer=1
@@ -499,7 +598,7 @@ function vert_ship()
   sfx(0)
   local start_frame,timer,spr0 = cur_frame,1,tc.ship_spr
   local dir=spr0==16 and 1 or -1
-  while timer <= 3 do 
+  while timer <= 3 and not bp do 
     if cur_frame-start_frame >= 2 then
       start_frame = cur_frame
       tc.ship_spr = spr0+timer*dir
@@ -507,35 +606,38 @@ function vert_ship()
     end
     yield()
   end
+  if bp then tc.ship_spr=16 end
 end
 
 function sensing_sequence()
+  --move_lock=false
   local ast = get_c_ast()
   if (
     ast.palette[1] ~= 3 or ast.palette[2] ~= 3 or 
     (ast.w>0 or ast.d>0)) then
-    m_lower =    cocreate(vert_ship)
-    m_water =    cocreate(gather_resource)
-    m_dirt  =    cocreate(gather_resource)
-    m_minerals = cocreate(gather_minerals)
-    m_raise =    cocreate(vert_ship)
+    local lower =    cocreate(vert_ship)
+    local water =    cocreate(gather_resource)
+    local dirt  =    cocreate(gather_resource)
+    local minerals = cocreate(gather_minerals)
+    local raise =    cocreate(vert_ship)
     while true do
-      if (m_lower and costatus(m_lower) != "dead") then
-        coresume(m_lower)
-      elseif (m_water and costatus(m_water) != "dead") then
-        m_lower = nil
-        coresume(m_water,ast,"w")
-      elseif (m_dirt and costatus(m_dirt) != "dead") then
-        m_water = nil
-        coresume(m_dirt,ast,"d")
-      elseif (m_minerals and costatus(m_minerals) != "dead") then
+      if (lower and costatus(lower) != "dead") then
+        coresume(lower)
+      elseif (water and costatus(water) != "dead") then
+        lower = nil
+        coresume(water,ast,"w")
+      elseif (dirt and costatus(dirt) != "dead") then
+        water = nil
+        coresume(dirt,ast,"d")
+      elseif (minerals and costatus(minerals) != "dead") then
         m_dirt = nil
-        coresume(m_minerals,ast)
-      elseif (m_raise and costatus(m_raise) != "dead") then
+        coresume(minerals,ast)
+      elseif (raise and costatus(raise) != "dead") then
         m_minerals = nil
-        coresume(m_raise)
+        coresume(raise)
       else
-        m_raise = nil
+        raise = nil
+        task=nil
         return
       end
       yield()
@@ -1145,8 +1247,6 @@ function draw_vert_meters()
 
   print("-",113,109,1)
   print("-",119,109,1)
-
-
 
 end
 
