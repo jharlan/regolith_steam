@@ -6,15 +6,48 @@ __lua__
 -- author: Jason Harlan
 
 function _update()
-  if (not g_seq) then
-    g_seq = cocreate(game_sequence)
-  end
+  g_seq=g_seq or cocreate(game_sequence)
   if (g_seq and costatus(g_seq) != "dead") then
     coresume(g_seq)
     update_objects()
   else
     g_seq = nil
   end
+end
+
+function game_sequence()
+  level_init()
+  local level=cocreate(level_processor)
+  local cutscene=cocreate(cutscene_sequence)
+  local over_reason
+  while true do
+    if (level and costatus(level) != "dead") then
+      _,over_reason=coresume(level)
+    elseif (cutscene and costatus(cutscene) != "dead") then
+      level=nil
+      coresume(cutscene,over_reason)
+    else
+      return
+    end
+    yield()
+  end
+end
+
+function level_processor()
+  local over_reason
+  local target=cocreate(target_process)
+  local ship=cocreate(ship_process)
+  
+  TASKS={}
+  INPUT_LOCK=nil
+  
+  while not over_reason do
+    over_reason=level_over()
+    coresume(target)
+    coresume(ship)
+    yield()
+  end
+  return over_reason
 end
 
 function _draw()
@@ -107,43 +140,8 @@ function Target:new(ship_spr)
 end
 
 
-function game_sequence()
-  level_init()
-  local level=cocreate(level_processor)
-  local cutscene=cocreate(cutscene_sequence)
-  local over_reason
-  while true do
-    if (level and costatus(level) != "dead") then
-      _,over_reason=coresume(level)
-    elseif (cutscene and costatus(cutscene) != "dead") then
-      level=nil
-      coresume(cutscene,over_reason)
-    else
-      return
-    end
-    yield()
-  end
-end
 
-function level_processor()
-  local over_reason
 
-  local target=cocreate(target_process)
-  local ship=cocreate(ship_process)
-  
-  TASKS={}
-  INPUT_LOCK=nil
-  
-  while not over_reason do
-    over_reason=level_over()
-
-    coresume(target)
-    coresume(ship)
-
-    yield()
-  end
-  return over_reason
-end
 
 function ship_process()
   local ready=cocreate(ready_wait_work)
