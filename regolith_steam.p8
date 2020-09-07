@@ -118,19 +118,23 @@ Target={}
 function Target:new(ship_spr)
   self.__index=self
   local o= {
+
+    f0=cur_frame,
+
     -- display arrow?
     an=true,
     aw=true,
     as=true,
     ae=true,
     -- arrow colors TODO - make dual colors for draw
-    ac=5,
+    ac=11,
     -- strings
     s0="",
     s2="",
     -- string colors
     c0=8,
     c2=8,
+
     -- ship
     ship_x=59,
     ship_y=59,
@@ -140,9 +144,9 @@ function Target:new(ship_spr)
   return o
 end
 
-
-
-
+function Target:get_color()
+  return get_tog_2(self.f0,cur_frame,8) and self.ac or 5
+end
 
 function ship_process()
   local ready=cocreate(ready_wait_work)
@@ -649,6 +653,10 @@ function get_toggle(tog)
   return tog
 end
 
+function get_tog_2(f0,cf,frame_delay)
+  return (cf-f0)%(frame_delay*2+1) < frame_delay
+end
+
 function redeem_coin(cur_mineral)
   local start_frame = cur_frame
   local timer = 0
@@ -1014,7 +1022,7 @@ end
 
 function draw_target()
 
-  pal(5,tc.ac) -- arrow colors shared
+  pal(5,tc:get_color()) -- arrow colors shared
   if(tc.an) spr(8,60,51,1,1,false,true) -- north
   if(tc.aw) spr(7,50,60,1,1,false,true) -- west
   if(tc.as) spr(8,59,70,1,1,true,false) -- south
@@ -1161,7 +1169,7 @@ end
 
 -- prints contents of the global lines
 function draw_console()
-  local cy=114
+  local cy=115
   local raw_text=lines[2]
   local ti=lines[1]
   local cursor=1
@@ -1178,12 +1186,12 @@ function draw_console()
     buffer=raw_text 
   end
   print("8888888888888888888888888888",8,cy,1)
-  print("8888888888888888888888888888",8,cy+6,1)
+  --print("8888888888888888888888888888",8,cy+6,1)
   print(buffer,8,cy,lines[3] or 15)
 
   -- second interface line
   cy +=6
-  print(lines[4] or "  \151restart",36,cy,13)
+  --print(lines[4] or "  \151restart",36,cy,13)
 end
 
 function draw_upper()
@@ -1235,8 +1243,8 @@ function draw_vert_meters()
   printv("fuel",119,23,player.w>16 and 2 or 8)
   printv("fuel",120,22,15)
 
-  rectfill(112,110-72,116,110,1)
-  rectfill(118,110-72,122,110,1)
+  rectfill(112,110-72,115,110,1)
+  rectfill(118,110-72,121,110,1)
 
   --water storage
   rectfill(119,110-player.w,122,110,12) -- fill
@@ -1245,8 +1253,8 @@ function draw_vert_meters()
 
 
   -- sensor
-  rectfill(4,110-72,8,110,1)
-  rectfill(10,110-72,14,110,1)
+  rectfill(5,110-72,8,110,1)
+  rectfill(11,110-72,14,110,1)
 
   rectfill(4,110-player.sensor[2],7,110,10)
   rectfill(10,110-player.sensor[1],13,110,14)
