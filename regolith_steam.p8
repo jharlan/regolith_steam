@@ -25,7 +25,6 @@ function game_sequence()
     if (level and costatus(level) != "dead") then
       _,over_reason=coresume(level)
     elseif (cutscene and costatus(cutscene) != "dead") then
-      level=nil
       coresume(cutscene,over_reason)
     else
       return
@@ -75,19 +74,36 @@ function _init()
   end
 end
 
+Task={}
+function Task:new(ast,dir)
+  self.__index=self
+  local task={}
+  task.dir=dir
+  if ast then 
+    task.ast=ast
+    task.w=ast.w
+    task.d=ast.d
+    task[14],task[10]=0,0
+    if (not ast_log[hkey(pairing(ast.x,ast.y))]) then
+      for i=1,2 do 
+        if (ast.palette[i]!=3) then -- ignore grey
+          task[allp[ast.palette[i]]]+=((i==1) and 105 or 45)*ast.lower_scale
+        end
+      end
+    end
+  end
+  setmetatable(task,self)
+  return task
+end
+function Task:has_mineral()
+  return self.w>0 or self.d>0 or self[14]>0 or self[10]>0
+end
+
 Beacon={}
 function Beacon:new(x,y,config)
-  --[[ 
-  coord%4  1  3  1  3
-        
-    coord  1  3  5  7
-         1 d  w  d  w
-         3 w  d  w  d
-         5 d  w  d  w
-  --]]
   self.__index=self
   srand(abs(pairing(x,y))+config.seed)
-  local beacon_type = (x%4==y%4) and "distance" or "weather"
+  local beacon_type=(x%4==y%4) and "distance" or "weather"
   local o={
     x=x,
     y=y,
@@ -126,7 +142,6 @@ function Target:new(ship_spr)
     aw=true,
     as=true,
     ae=true,
-    -- arrow colors TODO - make dual colors for draw
     ac=11,
     -- strings
     s0="",
@@ -144,8 +159,13 @@ function Target:new(ship_spr)
   return o
 end
 
+function Target:reset()
+  self.an,self.aw,self.as,self.ae=true,true,true,true
+  self.ac,self.s0,self.s2=11,"",""
+end
+
 function Target:get_color()
-  return get_tog_2(self.f0,cur_frame,8) and self.ac or 5
+  return get_tog(self.f0,cur_frame,6) and self.ac or 5
 end
 
 function ship_process()
@@ -155,10 +175,8 @@ function ship_process()
     if (ready and costatus(ready) != "dead") then
       _,process=coresume(ready)
     elseif (process and costatus(process) != "dead") then
-      ready=nil
       coresume(process)
     else
-      process=nil
       ready=cocreate(ready_wait_work)
     end
     yield()
@@ -266,10 +284,8 @@ function cutscene_sequence(over_reason)
     if (scene and costatus(scene) != "dead") then
       coresume(scene,over_reason)
     elseif (ready and costatus(ready) != "dead") then
-      scene=nil
       _,process=coresume(ready,dispatch) -- TODO alter expected methods
     elseif (process and costatus(process) != "dead") then
-      ready=nil 
       coresume(process) 
     else
       return 
@@ -280,75 +296,48 @@ end
 
 function mine_sequence(task)
   local thrust=cocreate(thrust_ship)
-  local mining=cocreate(sensing_sequence)
+  local sensing=cocreate(sensing_sequence)
   while true do
     if (thrust and costatus(thrust) != "dead") then
       coresume(thrust,task.dir)
-   elseif (mining and costatus(mining) != "dead") then
-      thrust=nil
-      INPUT_LOCK=nil
-      coresume(mining)
+   elseif (sensing and costatus(sensing) != "dead") then
+      coresume(sensing,task)
     else
-     -- thrust=nil
-      mining=nil
-      player.move_count +=1
+      player.move_count+=1
+      -- update visited asteroid
+      local pal_dist={[6]=10,[5]=2} -- base 6 was 10
+      if (task.w>0) pal_dist[12]=2 -- add some water
+      if (task.d>0) pal_dist[4]=4
+      task.ast.pal_dist=build_dist(pal_dist) 
+      ast_log[hkey(pairing(task.ast.x,task.ast.y))]=true
       return
     end
     yield()
   end
 end
 
-function gather_minerals(ast)
-  if (
-    not ast_log[hkey(pairing(ast.x,ast.y))] and -- have not been here before
-    (ast.palette[1]!=3 or ast.palette[2]!=3)) then
-
-    local toggle=true
-    tc.s0,tc.c0 = "MINING",15
-
-    for i=1,2 do -- loop through primary and secondary
-      local cur_mineral = ast.palette[i] 
-
-      if (cur_mineral==1 or cur_mineral==2) then
-
-        tc.c2=allp[cur_mineral]
-        local mineral_vol = ((i==1) and 105 or 45)*ast.lower_scale
-        local player_sensor = player.sensor
-
-        while mineral_vol > 0 do
-
-          sfx(4+cur_mineral)
-          toggle=get_toggle(toggle)
-          tc.ac =toggle and cur_mineral or 5
-          tc.s2 =(toggle and player.lvl==1) and m_names[cur_mineral] or ""
-
-          player_sensor[cur_mineral] += 1 
-          mineral_vol -= 1
-
-          if (player_sensor[cur_mineral] == 72) then
-            redeem_coin(cur_mineral)
-            player_sensor[cur_mineral] = 0  
-          end
-
-          yield()
-        end
-      end
-      yield()
+function gather_mineral(mineral,volume)
+  local f0=cur_frame
+  local player_sensor=player.sensor
+  while volume > 0 do
+    player_sensor[mineral]+=1 
+    volume-=1
+    if (player_sensor[mineral]==72) then
+      redeem_coin(mineral)
+      player_sensor[mineral]=0  
     end
-
-    tc=Target:new(tc.ship_spr)
-
-    if (player.lvl == 1 and player.message_index == 3) then
-      player.message_index=4
-      lines = {0,clvl.lines[4]}
-    end
+    if (not INPUT_LOCK) yield()
   end
-  -- update sold asteroid
-  local pal_dist = {[6]=10,[5]=2} -- base 6 was 10
-  if (ast.w>0) pal_dist[12]=2 -- add some water
-  if (ast.d>0) pal_dist[4]=4
-  ast.pal_dist = build_dist(pal_dist) 
-  ast_log[hkey(pairing(ast.x,ast.y))] = true
+end
+
+function gather_resource(resource)
+  local f0=cur_frame
+  local sound=resource=="w" and 4 or 3
+  while player[resource] < 72 do
+    sfx(sound)
+    player[resource]+=1
+    if (not INPUT_LOCK) yield()
+  end
 end
 
 function toggle_beacons(dir,toggle)
@@ -392,34 +381,6 @@ function decrement_resources(dir)
   end 
 end
 
-function gather_resource(ast,resource)
-  if (ast[resource]>0) then
-    local toggle=true
-    local sound = resource == "w" and 4 or 3
-    local msg=(resource=="w") and {"FUEL",12,2} or {"SHIELD",4,3}
-    tc.s0,tc.c0,tc.c2="MINING",15,msg[2]
-
-    while player[resource] <= 68 do
-      toggle=get_toggle(toggle)
-      tc.ac = toggle and 5 or msg[2]
-      tc.s2 = (toggle and player.lvl==1) and msg[1] or ""
-      sfx(sound)
-      player[resource] += 1
-      yield()
-    end
-
-    if bp then player[resource]=68 end
-
-    tc=Target:new(tc.ship_spr)
-
-    if (player.lvl == 1 and player.message_index == msg[3]-1) then
-      player.message_index=msg[3]
-      lines = {0,clvl.lines[msg[3]]}
-    end
-
-  end
-end
-
 enqueue=add
 function dequeue(queue)
   local v = queue[1]
@@ -441,37 +402,17 @@ function target_process()
     if (ready and costatus(ready) != "dead") then
       _,process=coresume(ready,dispatch)
     elseif (process and costatus(process) != "dead") then
-      ready=nil
       coresume(process)
     else
-      process=nil
       ready=cocreate(ready_wait_input)
     end
     yield()
   end
 end
 
-function target_task(ast,dir)
-  local task={}
-  task.dir=dir
-  if ast then 
-    task.w=ast.w
-    task.d=ast.d
-    task[14],task[10]=0,0
-    if (not ast_log[hkey(pairing(ast.x,ast.y))]) then
-      for i=1,2 do 
-        if (ast.palette[i]!=3) then -- ignore grey
-          task[allp[ast.palette[i]]]+=((i==1) and 105 or 45)*ast.lower_scale
-        end
-      end
-    end
-  end
-  return task
-end
-
 function target_working(dir)
   spawn_belt(dir)
-  tc.s0=""  
+  tc.s0,tc.ac="",5 
   tc.aw,tc.ae,tc.an,tc.as=(dir=="e"),(dir=="w"),(dir=="s"),(dir=="n")
 
   local dtb={n=3,w=1,s=2,e=0} -- dir to button translate
@@ -482,7 +423,6 @@ function target_working(dir)
 
   local start_frame=cur_frame
   local timer=1
-  local toggle=true
 
   -- 1. set input lock
   INPUT_LOCK=true
@@ -509,7 +449,7 @@ function target_working(dir)
   end
 
   -- 3. add task
-  enqueue(TASKS,target_task(get_c_ast(),dir))
+  enqueue(TASKS,Task:new(get_c_ast(),dir))
 
   -- 4. wait for lock to release
   while INPUT_LOCK do
@@ -556,13 +496,10 @@ function thrust_ship(dir)
 
   local start_frame=cur_frame
   local timer=1
-  local toggle=true
 
   -- thrust ship portion
   timer=1
-  start_frame=cur_frame
   while timer<=16 do
-    toggle=get_toggle(toggle)
     if cur_frame-start_frame >=1 then 
       start_frame=cur_frame
       if (timer==6) toggle_beacons(dir,true)
@@ -571,9 +508,7 @@ function thrust_ship(dir)
         if (assist) then
           tc.s0,tc.s2,tc.c0,tc.c2,lines="MOVE","COST",15,15,{0,clvl.lines[5]}
           while (not btnp(dtb[dir])) do
-            toggle=get_toggle(toggle)
-            toggle_beacons(dir,toggle)
-            tc.ac = toggle and 5 or 11
+            toggle_beacons(dir,get_tog(start_frame,cur_frame,6))
             yield()
           end
           sfx(0)
@@ -592,7 +527,9 @@ function thrust_ship(dir)
     yield()
   end
 
-  --tc=Target:new(tc.ship_spr)
+  INPUT_LOCK=nil
+  tc:reset()
+
   if (assist) lines={0,clvl.lines[player.message_index]}
   new_beacons=spawn_beacons(player.x,player.y,clvl)
 end
@@ -601,46 +538,39 @@ function vert_ship()
   sfx(0)
   local start_frame,timer,spr0 = cur_frame,1,tc.ship_spr
   local dir=spr0==16 and 1 or -1
-  while timer <= 3 and not bp do 
+  while timer <= 3 do 
     if cur_frame-start_frame >= 2 then
-      start_frame = cur_frame
-      tc.ship_spr = spr0+timer*dir
-      timer += 1
+      start_frame=cur_frame
+      tc.ship_spr=spr0+timer*dir
+      timer+=1
     end
     yield()
   end
-  if bp then tc.ship_spr=16 end
 end
 
-function sensing_sequence()
-  --move_lock=false
+function sensing_sequence(task)
   local ast = get_c_ast()
-  if (
-    ast.palette[1] ~= 3 or ast.palette[2] ~= 3 or 
-    (ast.w>0 or ast.d>0)) then
-    local lower =    cocreate(vert_ship)
-    local water =    cocreate(gather_resource)
-    local dirt  =    cocreate(gather_resource)
-    local minerals = cocreate(gather_minerals)
-    local raise =    cocreate(vert_ship)
+  if (task:has_mineral()) then
+    local lower=cocreate(vert_ship)
+    local water=task.w>0 and cocreate(gather_resource) or nil
+    local dirt=task.d>0 and cocreate(gather_resource) or nil
+    local m10=task[10]>0 and cocreate(gather_mineral) or nil
+    local m14=task[14]>0 and cocreate(gather_mineral) or nil
+    local raise=cocreate(vert_ship)
     while true do
       if (lower and costatus(lower) != "dead") then
         coresume(lower)
       elseif (water and costatus(water) != "dead") then
-        lower = nil
-        coresume(water,ast,"w")
+        coresume(water,"w")
       elseif (dirt and costatus(dirt) != "dead") then
-        water = nil
-        coresume(dirt,ast,"d")
-      elseif (minerals and costatus(minerals) != "dead") then
-        m_dirt = nil
-        coresume(minerals,ast)
+        coresume(dirt,"d")
+      elseif (m10 and costatus(m10) != "dead") then
+        coresume(m10,10,task[10])
+      elseif (m14 and costatus(m14) != "dead") then
+        coresume(m14,14,task[14])
       elseif (raise and costatus(raise) != "dead") then
-        m_minerals = nil
         coresume(raise)
       else
-        raise = nil
-        task=nil
         return
       end
       yield()
@@ -648,16 +578,11 @@ function sensing_sequence()
   end
 end
 
-function get_toggle(tog)
-  if(cur_frame%6==0) return not tog 
-  return tog
-end
-
-function get_tog_2(f0,cf,frame_delay)
+function get_tog(f0,cf,frame_delay)
   return (cf-f0)%(frame_delay*2+1) < frame_delay
 end
 
-function redeem_coin(cur_mineral)
+function redeem_coin(mineral)
   local start_frame = cur_frame
   local timer = 0
 
@@ -666,20 +591,20 @@ function redeem_coin(cur_mineral)
       start_frame = cur_frame
       timer += 1
       sfx(7)
-      coin.offset[cur_mineral] = timer
-      coin.spr[cur_mineral][1] = 82+timer%2 -- gold
-      coin.spr[cur_mineral][2] = 98+timer%2 -- shadow
+      coin.offset[mineral] = timer
+      coin.spr[mineral][1] = 82+timer%2 -- gold
+      coin.spr[mineral][2] = 98+timer%2 -- shadow
     end
     yield()
   end
 
-  coin.spr[cur_mineral][1],coin.spr[cur_mineral][2]=82,98
-  coin.offset[cur_mineral]=0
+  coin.spr[mineral][1],coin.spr[mineral][2]=82,98
+  coin.offset[mineral]=0
 
-  if (cur_mineral==1) then
-    player.goal_attain += 2
+  if (mineral==14) then
+    player.goal_attain+=2
   else
-    player.goal_attain += 1
+    player.goal_attain+=1
   end
 end
 
@@ -789,17 +714,17 @@ end
 
 --- discrete distribution sampling helpers
 function build_dist(dist)
-  local rl = {}
-  local t = 0
+  local rl={}
+  local t=0
   for e,v in pairs(dist) do
-    t += tonum(v) -- may come in as a string
+    t+=tonum(v) -- may come in as a string
     add(rl,{[0]=e,t})
   end
   return {[0]=t,rl}
 end
 
 function get_from_dist(dl)
-  local pag = rnd(dl[0]) -- aggregate value
+  local pag=rnd(dl[0]) -- aggregate value
   for v in all(dl[1]) do
     if (v[1]>= pag) return v[0]
   end
@@ -869,16 +794,16 @@ end
 
 function spawn_belt(dir)
   for c=-2,2,2 do
-    if (dir == "w") then -- moving left so adding to the right
+    if (dir=="w") then -- moving left so adding to the right
       add_new_ast(player.x-4,player.y+c)  -- top
       set_ast_cull(player.x+4,player.y+c)
-    elseif (dir == "e") then
+    elseif (dir=="e") then
       add_new_ast(player.x+4,player.y+c)  -- top
       set_ast_cull(player.x-4,player.y+c)
-    elseif (dir == "n") then
+    elseif (dir=="n") then
       add_new_ast(player.x+c,player.y-4)
       set_ast_cull(player.x+c,player.y+4)
-    elseif (dir == "s") then
+    elseif (dir=="s") then
       add_new_ast(player.x+c,player.y+4)
       set_ast_cull(player.x+c,player.y-4)
     end
@@ -897,13 +822,13 @@ function level_init()
 
   tc=Target:new() -- center text
   
-  coin={spr={{82,98},{82,98}},offset={0,0}}
+  coin={spr={[10]={82,98},[14]={82,98}},offset={[10]=0,[14]=0}}
 
   player.x=px0--2000   --0
   player.y=py0--3000    --8
-  player.d=68--2 -- dirt 
-  player.w=68--72--2 -- water
-  player.sensor=(player.lvl==1) and {30,30} or {2,2} 
+  player.d=72--2 -- dirt 
+  player.w=72--72--2 -- water
+  player.sensor=(player.lvl==1) and {[10]=30,[14]=30} or {[10]=2,[14]=2} 
   player.move_count=0
   player.message_index=1
   player.goal_attain=0
@@ -925,11 +850,11 @@ function level_init()
 end
 
 function level_over()
-  local over_reason = false
-  if (player.w<=0) over_reason = "water"
-  if (player.d<=0) over_reason = "dirt"
-  if (player.goal_attain>=clvl.goal) over_reason = "goal"
-  if (over_reason=="goal" and player.lvl>=#lvl_list) over_reason = "win"
+  local over_reason=false
+  if (player.w<=0) over_reason="water"
+  if (player.d<=0) over_reason="dirt"
+  if (player.goal_attain>=clvl.goal) over_reason="goal"
+  if (over_reason=="goal" and player.lvl>=#lvl_list) over_reason="win"
   return over_reason
 end
 
@@ -948,8 +873,8 @@ function update_objects()
   triangle_list={}
 
   for ast in all(ast_list) do
-    ast.ax += .005--.005--flr(rnd(10))/1800
-    ast.az += .015--.015
+    ast.ax+=.005--.005--flr(rnd(10))/1800
+    ast.az+=.015--.015
     update_visible(ast)
     transform_object(ast)
     cam_transform_object(ast)
@@ -998,10 +923,8 @@ end
 function draw_display()
   draw_message_box()
   draw_upper()
-
   draw_vert_meters()
   draw_console()
-  draw_frame()
 end
 
 function printv(s,x0,y0,c)
@@ -1012,7 +935,7 @@ end
 
 function draw_goal()
   for i=0,clvl.goal-1 do
-    local gspr = (player.goal_attain-i > 0) and 98 or 82
+    local gspr=(player.goal_attain-i > 0) and 98 or 82
     pal(2,1)
     spr(98,67+i*4+26+1,10)
     pal()
@@ -1094,76 +1017,6 @@ function draw_message_box()
   rectfill(110,0,127,127,0) -- right
   rectfill(0,0,127,16,0)       -- top
   rectfill(0,112,127,127,0) -- bot
-
-end
-
-function draw_frame()
---fillp(0b0010000111001100)
---fillp(0b1100110011111100)
-
-  -- new interior edges
-  --rectfill(14,35,14,93,6) -- vert
-  --rectfill(111,15,112,113,6) 
-  --rectfill(14,15,112,15,6) -- horiz
-  --rectfill(14,113,112,113,6)
-  -- new outer edges
---rectfill(2,19,3,109,5)
-  --rectfill(124,19,125,109,1)
-  --rectfill(12,126,114,126,1)
-
-  --
---[[
-  -- caps
-  spr(24,101,9)
-  spr(24,101,0,1,1,false,true)
-  spr(24,18,9,1,1,true)
-  spr(24,18,0,1,1,true,true)
-
-  spr(25,111,21,1,1,false,true)
-  spr(25,120,21,1,1,true,true)
-
-  spr(25,111,100)
-  spr(25,120,100,1,1,true)
-
-  spr(25,-1,21,1,1,false,true)
-  spr(25,8,21,1,1,true,true)
-
-  spr(25,-1,100)
-  spr(25,8,100,1,1,true)
-
---]]
-
---[[
-
-  --ornaments
-  spr(88,111,104,2,3)
-  spr(88,0,104,2,3,true,false)
-
-  spr(117,16,5)
-  spr(117,103,5,1,1,true,false)
-
---]]
-
-  -- latches
---[[
-  spr(26,107,31)
-  spr(30,119,31)
-
-  spr(26,107,91)
-  spr(30,119,91)
-
-  spr(26,12,31,1,1,true)
-  spr(30,0,31,1,1,true)
-  
-  spr(26,12,91,1,1,true)
-  spr(30,0,91,1,1,true)
-
-  spr(27,30,13,1,1,false,true)
-  spr(27,90,13,1,1,false,true)
-
-  spr(27,30,108)
-  spr(27,90,108)
---]]
 
 end
 
@@ -1251,24 +1104,23 @@ function draw_vert_meters()
   -- dirt storage
   rectfill(113,110-player.d,116,110,4) -- fill
 
-
   -- sensor
   rectfill(5,110-72,8,110,1)
   rectfill(11,110-72,14,110,1)
 
-  rectfill(4,110-player.sensor[2],7,110,10)
-  rectfill(10,110-player.sensor[1],13,110,14)
+  rectfill(4,110-player.sensor[10],7,110,10)
+  rectfill(10,110-player.sensor[14],13,110,14)
 
   -- coins
-  spr(coin.spr[2][2],3,32-coin.offset[2])
-  spr(coin.spr[2][1],2,31-coin.offset[2])
+  spr(coin.spr[10][2],3,32-coin.offset[10])
+  spr(coin.spr[10][1],2,31-coin.offset[10])
 
   -- pink
-  spr(coin.spr[1][2],9,32-coin.offset[1])
-  spr(coin.spr[1][1],8,31-coin.offset[1])
+  spr(coin.spr[14][2],9,32-coin.offset[14])
+  spr(coin.spr[14][1],8,31-coin.offset[14])
 
-  spr(coin.spr[1][2],9,24-coin.offset[1])
-  spr(coin.spr[1][1],8,23-coin.offset[1])
+  spr(coin.spr[14][2],9,24-coin.offset[14])
+  spr(coin.spr[14][1],8,23-coin.offset[14])
 
 fillp(0)
 end
