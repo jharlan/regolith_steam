@@ -364,21 +364,33 @@ end
 function decrement_resources(dir)
    if (dir=="e") then -- ship moving west
     -- crossing col 5
-    player[new_beacons[5][5].t]-=new_beacons[5][5].value*2
-    player[new_beacons[5][7].t]-=new_beacons[5][7].value*2
+    player[new_beacons[5][5].t]=safe_dec(
+      player[new_beacons[5][5].t],new_beacons[5][5].value*2)
+    player[new_beacons[5][7].t]=safe_dec(
+      player[new_beacons[5][7].t],new_beacons[5][7].value*2)
   elseif (dir=="w") then -- ship moving east
     -- crossing col 7
-    player[new_beacons[7][5].t]-=new_beacons[7][5].value*2
-    player[new_beacons[7][7].t]-=new_beacons[7][7].value*2
+    player[new_beacons[7][5].t]=safe_dec(
+      player[new_beacons[7][5].t],new_beacons[7][5].value*2)
+    player[new_beacons[7][7].t]=safe_dec(
+      player[new_beacons[7][7].t],new_beacons[7][7].value*2)
   elseif (dir=="s") then -- ship moving north
     -- crossing row 5
-    player[new_beacons[5][5].t]-=new_beacons[5][5].value*2
-    player[new_beacons[7][5].t]-=new_beacons[7][5].value*2
+    player[new_beacons[5][5].t]=safe_dec(
+      player[new_beacons[5][5].t],new_beacons[5][5].value*2)
+    player[new_beacons[7][5].t]=safe_dec(
+      player[new_beacons[7][5].t],new_beacons[7][5].value*2)
   elseif (dir=="n") then -- ship moving south
     -- crossing row 7
-    player[new_beacons[5][7].t]-=new_beacons[5][7].value*2
-    player[new_beacons[7][7].t]-=new_beacons[7][7].value*2
+    player[new_beacons[5][7].t]=safe_dec(
+      player[new_beacons[5][7].t],new_beacons[5][7].value*2)
+    player[new_beacons[7][7].t]=safe_dec(
+      player[new_beacons[7][7].t],new_beacons[7][7].value*2)
   end 
+end
+
+function safe_dec(prev,dec)
+  return (prev-dec)<0 and 0 or prev-dec
 end
 
 enqueue=add
@@ -827,8 +839,8 @@ function level_init()
 
   player.x=px0--2000   --0
   player.y=py0--3000    --8
-  player.d=72--2 -- dirt 
-  player.w=72--72--2 -- water
+  player.d=72--72 -- dirt 
+  player.w=72--72 -- water
   player.sensor=(player.lvl==1) and {[10]=30,[14]=30} or {[10]=2,[14]=2} 
   player.move_count=0
   player.message_index=1
@@ -1051,8 +1063,6 @@ function draw_console()
 end
 
 function draw_upper()
-  --print("8888888888",72,4,1)
-  --print("8888888888",72,10,1)
   print("level",74,4,1)
   print("level",75,3,8)
   print(" 00"..tostr(player.lvl),94,4,1)
@@ -1070,31 +1080,14 @@ end
 
 function draw_vert_meters()
 
---[[
-  for i=4,20 do
-    spr(13,4,27+i*3)
-    spr(13,10,27+i*3)
-    spr(13,112,27+i*3)
-    spr(13,118,27+i*3)
-  end
-  for i=13,20 do
-    spr(14,10,27+i*3)
-    pal(14,10)
-    spr(14,4,27+i*3)
-    pal(14,4)
-    spr(14,112,27+i*3)
-    pal(14,12)
-    spr(14,118,27+i*3)
-    pal()
-  end
---]]
-
   fillp(0b1111000011110000.1)
   
-  printv("shield",113,15,player.d>16 and 2 or 8)
+  printv("shield",113,15,
+    player.d>16 and 2 or (get_tog(tc.f0,cur_frame,6) and 8 or 2))
   printv("shield",114,14,15)
 
-  printv("fuel",119,23,player.w>16 and 2 or 8)
+  printv("fuel",119,23,
+    player.w>16 and 2 or (get_tog(tc.f0,cur_frame,6) and 8 or 2))
   printv("fuel",120,22,15)
 
   rectfill(112,110-72,115,110,1)
