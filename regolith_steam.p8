@@ -152,7 +152,7 @@ function Target:new(ship_spr)
 
     -- ship
     ship_x=59,
-    ship_y=59,
+    ship_y=61,
     ship_spr=ship_spr or 16
   }
   setmetatable(o,self)
@@ -873,7 +873,7 @@ function update_objects()
   matrix_inverse()
   vx,vy,vz=rotate_point(0,0,.2)
   cam_x=player.x
-  cam_y=player.y
+  cam_y=player.y+.2
   cam_z=player.z
   cam_ax=player.ax
   cam_ay=player.ay
@@ -957,10 +957,10 @@ function draw_target()
 
   pal(5,tc:get_color()) -- arrow colors shared
   pal(7,3)
-  if(tc.an) spr(8,60,51,1,1,false,true) -- north
-  if(tc.aw) spr(7,50,60,1,1,false,true) -- west
-  if(tc.as) spr(8,59,70,1,1,true,false) -- south
-  if(tc.ae) spr(7,69,61,1,1,true,false) -- east
+  if(tc.an) spr(8,60,53,1,1,false,true) -- north
+  if(tc.aw) spr(7,50,62,1,1,false,true) -- west
+  if(tc.as) spr(8,59,72,1,1,true,false) -- south
+  if(tc.ae) spr(7,69,63,1,1,true,false) -- east
   pal()
 
   if(tc.s0!="") then
@@ -988,22 +988,22 @@ function draw_beacon_nums()
       local beacon=new_beacons[col][row]
       if (beacon.toggle) pal({[13]=8,[6]=14})
       -- ring
-      spr(1,x0+col*15-5-30,y0+row*15+1-5-30,1,1,true,true)
-      spr(1,x0+col*15-30,y0+row*15+1-30)
+      spr(1,x0+col*15-5-30,y0+row*15+1-5-30+2,1,1,true,true)
+      spr(1,x0+col*15-30,y0+row*15+1-30+2)
       pal()
       -- number
       print(
         (player.w>0 and player.d>0) and beacon.value or "?",
         x0+col*15-30,
-        y0+row*15-30,
+        y0+row*15-30+2,
         beacon.color
       )
       -- edge
       pal(8,5)
-      spr(3,x0+col*15+1-30,y0+row*15+8-30)
-      spr(3,x0+col*15+1-30,y0+row*15-10-30)
-      spr(4,x0+col*15+7-30,y0+row*15+2-30)
-      spr(4,x0+col*15-11-30,y0+row*15+2-30)
+      spr(3,x0+col*15+1-30,y0+row*15+8-30+2)
+      spr(3,x0+col*15+1-30,y0+row*15-10-30+2)
+      spr(4,x0+col*15+7-30,y0+row*15+2-30+2)
+      spr(4,x0+col*15-11-30,y0+row*15+2-30+2)
       pal()
     end
   end
@@ -1019,22 +1019,22 @@ function draw_message_box()
 
   rectfill(0,0,17,127,0)       -- left
   rectfill(109,0,127,127,0) -- right
-  rectfill(0,0,127,18,0)       -- top
-  rectfill(0,110,127,127,0) -- bot
+  rectfill(0,0,127,20,0)       -- top
+  rectfill(0,112,127,127,0) -- bot
 
   draw_beacon_nums()
   draw_target() -- new place for draw_target
 
   rectfill(0,0,16,127,0)       -- left
   rectfill(110,0,127,127,0) -- right
-  rectfill(0,0,127,16,0)       -- top
-  rectfill(0,112,127,127,0) -- bot
+  rectfill(0,0,127,18,0)       -- top
+  rectfill(0,114,127,127,0) -- bot
 
 end
 
 -- prints contents of the global lines
 function draw_console()
-  local cy=115
+  local cy=116
   local raw_text=lines[2]
   local ti=lines[1]
   local cursor=1
@@ -1081,21 +1081,21 @@ function draw_vert_meters()
 
   fillp(0b1111000011110000.1)
   
-  printv("shield",113,15,
+  printv("shield",114,15,
     player.d>16 and 2 or (get_tog(tc.f0,cur_frame,6) and 8 or 2))
-  printv("shield",114,14,15)
+  printv("shield",113,14,15)
 
-  printv("fuel",119,23,
+  printv("fuel",120,23,
     player.w>16 and 2 or (get_tog(tc.f0,cur_frame,6) and 8 or 2))
-  printv("fuel",120,22,15)
+  printv("fuel",119,22,15)
 
-  rectfill(112,110-72,115,110,1)
-  rectfill(118,110-72,121,110,1)
+  rectfill(113,110-72,116,110,1)
+  rectfill(119,110-72,122,110,1)
 
   --water storage
-  rectfill(119,110-player.w,122,110,12) -- fill
+  rectfill(118,110-player.w,121,110,12) -- fill
   -- dirt storage
-  rectfill(113,110-player.d,116,110,4) -- fill
+  rectfill(112,110-player.d,115,110,4) -- fill
 
   -- sensor
   rectfill(5,110-72,8,110,1)
@@ -1104,6 +1104,7 @@ function draw_vert_meters()
   rectfill(4,110-player.sensor[10],7,110,10)
   rectfill(10,110-player.sensor[14],13,110,14)
 
+  pal(2,1)
   -- coins
   spr(coin.spr[10][2],3,32-coin.offset[10])
   spr(coin.spr[10][1],2,31-coin.offset[10])
@@ -1112,8 +1113,8 @@ function draw_vert_meters()
   spr(coin.spr[14][2],9,32-coin.offset[14])
   spr(coin.spr[14][1],8,31-coin.offset[14])
 
-  spr(coin.spr[14][2],9,24-coin.offset[14])
-  spr(coin.spr[14][1],8,23-coin.offset[14])
+  spr(coin.spr[14][2],9,25-coin.offset[14])
+  spr(coin.spr[14][1],8,24-coin.offset[14])
 
 fillp(0)
 end
