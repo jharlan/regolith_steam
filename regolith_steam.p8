@@ -676,23 +676,7 @@ function print3(str,x,y,col)
 end
 
 function str_to_table(delim,tbl_str,isnum)
-  local rt,val,cs,len={},"","",#tbl_str
-  for i=1,len do
-    cs = sub(tbl_str,i,i)
-    if (cs==delim or not delim) then -- delim can be nil
-      if (not delim) val = cs
-      val = isnum and tonum(val) or val
-      add(rt,val)
-      val=""
-    else
-      val = val..cs
-    end
-  end
-  if(val and delim) then
-    val = isnum and tonum(val) or val
-    add(rt,val)
-  end
-  return rt 
+  return split(tbl_str,delim or "",isnum)
 end
 
 function load_lvl(enc_lvl)
