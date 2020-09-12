@@ -3,7 +3,8 @@ version 29
 __lua__
 
 -- game:   Regolith
--- author: Jason Harlan
+-- author: (personaj) Jason Harlan
+-- date: Sept. 12, 2020
 
 function _update()
   cur_frame+=1
@@ -955,7 +956,7 @@ end
 
 function draw_goal()
   for i=0,clvl.goal-1 do
-    local gspr=(player.goal_attain-i > 0) and 98 or 82
+    local gspr=(player.goal_attain-i > 0) and 100 or 82
     pal(2,1)
     spr(98,i*4+91,12)
     pal(2,3)
