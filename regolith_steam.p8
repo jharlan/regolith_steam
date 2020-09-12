@@ -195,7 +195,7 @@ end
 function ready_wait_input(dispatch)
   local p
   while not p do
-    if not INPUT_LOCK then
+    --if not INPUT_LOCK then
       if(btnp(1) and dispatch["ra"]) then
         p=cocreate(dispatch["ra"])
       elseif(btnp(0) and dispatch["la"]) then
@@ -207,7 +207,7 @@ function ready_wait_input(dispatch)
       elseif(btnp(5) and dispatch["x"]) then
         p=cocreate(dispatch["x"])
       end
-    end
+    --end
     yield()
   end
   return p
@@ -219,7 +219,8 @@ function cutscene(over_reason)
   update_objects()
 
   -- nil target
-  tc.an,tc.aw,tc.as,tc.ae=nil,nil,nil,nil
+
+  tc.an,tc.aw,tc.as,tc.ae=true,true,true,true
   tc.s0,tc.s2="",""
 
   local timer=1
@@ -227,19 +228,25 @@ function cutscene(over_reason)
 
   local ship_dir={
     ((59-tc.ship_x)<0 and -1 or ((59-tc.ship_x)==0 and 0 or 1)),
-    ((59-tc.ship_y)<0 and -1 or ((59-tc.ship_y)==0 and 0 or 1))
+    ((61-tc.ship_y)<0 and -1 or ((61-tc.ship_y)==0 and 0 or 1))
   }
 
   if (over_reason == "restart") then -- TODO change restart to restart level
 
   elseif (over_reason == "goal") then
-    --sfx(14)
-    -- screen wipe
-    lines={0,"     level complete!!!",11,"  \151continue"}
+    tc.ship_x,tc.ship_y=59,61
+    tc.s0,tc.s2="LEVEL","UP"
+    tc.c0,tc.c2=14,14
+    tc.ac=14
+    lines={0,"     ...level complete!!! - press x for the next level...",11}
     player.lvl =player.lvl+1
 
   elseif (over_reason=="win") then
-    lines={0,"        you win!!!",7}
+    tc.ship_x,tc.ship_y=59,61
+    tc.s0,tc.s2="YOU","WIN"
+    tc.c0,tc.c2=14,14
+    tc.ac=14
+    lines={0,"    ...congratulations! you win!!! you are a skilled miner...",14}
     player.lvl=1
 
   elseif (over_reason=="dirt") then
@@ -250,25 +257,30 @@ function cutscene(over_reason)
       tc.ship_x+=ship_dir[1] 
       tc.ship_y+=ship_dir[2]
       tc.ship_spr=32+timer-1
-        lines={0,"     shields down!!!",8}
+        lines={0,"  ...shields down!!! - press x to restart level...",8}
         timer+=1        
       end
       yield()
     end 
+    tc.ship_x,tc.ship_y=59,61
+    tc.s0,tc.s2="GAME","OVER"
+    tc.c0,tc.c2=8,8
+    tc.ac=8
   elseif (over_reason=="water") then
-    -- animate drifting
-    sfx(13)
     while timer <=14 do
-      -- move ship to center
       if cur_frame-start_frame >= 6 then
       tc.ship_x+=ship_dir[1]
       tc.ship_y+=ship_dir[2]
-      --tc.ship_spr=32+timer-1
-        lines={0,"       fuel empty!!!",8}
+        lines={0,"   ...fuel empty!!! - press x to restart level...",8}
         timer+=1        
       end
       yield()
     end 
+    tc.ship_x,tc.ship_y=59,61
+    tc.s0,tc.s2="GAME","OVER"
+    tc.c0,tc.c2=8,8
+    tc.ac=8
+    sfx(13)
   end
 end
 
@@ -318,8 +330,10 @@ end
 
 function gather_mineral(mineral,volume)
   local f0=cur_frame
+  local sounds={[10]=5,[14]=6}
   local player_sensor=player.sensor
   while volume > 0 do
+    sfx(sounds[mineral])
     player_sensor[mineral]+=1 
     volume-=1
     if (player_sensor[mineral]==72) then
@@ -328,6 +342,11 @@ function gather_mineral(mineral,volume)
     end
     if (not INPUT_LOCK) yield()
   end
+  if (player.lvl==1 and player.message_index<4) then
+    player.message_index=4
+    lines={0,clvl.lines[player.message_index]}
+  end
+  
 end
 
 function gather_resource(resource)
@@ -337,6 +356,13 @@ function gather_resource(resource)
     sfx(sound)
     player[resource]+=1
     if (not INPUT_LOCK) yield()
+  end
+  if (player.lvl==1 and player.message_index==1) then
+    player.message_index=2
+    lines={0,clvl.lines[player.message_index]}
+  elseif (player.lvl==1 and player.message_index==2) then
+    player.message_index=3
+    lines={0,clvl.lines[player.message_index]}
   end
 end
 
@@ -407,8 +433,7 @@ function target_process()
     ["ra"]=function() target_working("w") end,
     ["la"]=function() target_working("e") end,
     ["da"]=function() target_working("n") end,
-    ["ua"]=function() target_working("s") end,
-    ["x"]=function() return end 
+    ["ua"]=function() target_working("s") end
   }
   while true do
     if (ready and costatus(ready) != "dead") then
@@ -439,7 +464,7 @@ function target_working(dir)
   -- 1. set input lock
   INPUT_LOCK=true
 
-  sfx(0)
+  sfx(1)
 
   -- 2. move target
   while timer <= 8 do
@@ -507,6 +532,7 @@ function thrust_ship(dir)
 
   -- thrust ship portion
   timer=1
+  sfx(0)
   while timer<=16 do
     if cur_frame-start_frame >=1 then 
       start_frame=cur_frame
@@ -518,7 +544,7 @@ function thrust_ship(dir)
         sfx(2)
         if (assist) then
           tc.ac=11
-          tc.s0,tc.s2,tc.c0,tc.c2,lines="MOVE","COST",15,15,{0,clvl.lines[5]}
+          tc.s0,tc.s2,tc.c0,tc.c2,lines="MOVE","COST",15,15,{0,clvl.lines[5],8}
           while (not btnp(dtb[dir])) do
             toggle_beacons(dir,get_tog(f0,cur_frame,3))
             yield()
@@ -948,7 +974,7 @@ function draw_goal()
     local gspr=(player.goal_attain-i > 0) and 98 or 82
     pal(2,1)
     spr(98,i*4+91,12)
-    pal()
+    pal(2,3)
     spr(gspr,i*4+90,11)
   end
 end
@@ -1062,14 +1088,12 @@ end
 function draw_upper()
   print("level",26,13,1)
   print("level",25,12,13)
-  print(" 00"..tostr(player.lvl),46,13,1)
-  print(" 00"..tostr(player.lvl),45,12,15)
+  print(" "..tostr(player.lvl)..":"..#lvl_list,46,13,1)
+  print(" "..tostr(player.lvl)..":"..#lvl_list,45,12,15)
 
   print("goal",75,13,1)
   print("goal",74,12,13)
   draw_goal()
-  --pal({[4]=1,[6]=1})
-  --spr(128,3,4,12,2)
   pal({[4]=2,[6]=2})
   spr(128,27,1,12,2)
   pal()
@@ -1644,7 +1668,7 @@ lvl_list={
   "    ...arrow keys move your ship - blue water asteroids refuel your ship...   ,"..
   "    ...brown regolith asteroids fix your shields...   ,"..
   "    ...yellow and pink asteroids are mined and sold for coins...   ,"..
-  "      collect coins!,"..
+  "       collect coins!,"..
   "    ...moving decreases fuel and shield... press arrow to continue...  @"..
   -- first ring
   "24,".. -- exist
@@ -1654,25 +1678,25 @@ lvl_list={
   "10|10|09," .. -- water f(primary)
   "10|10|10=".. --dirt as f(primary)
   -- second ring
-  "23,".. -- exist
+  "21,".. -- exist
   "001,".. -- primary
   "001|001|001," .. -- secondary as function of primary
   "12341|12311|12311," .. -- volume as f(primary)
   "10|10|10," .. -- water f(primary)
   "10|10|01=".. --dirt as f(primary)
   -- third ring
-  "24,".. -- exist
+  "32,".. -- exist
   "221,".. -- primary
   "001|001|001," .. -- secondary as function of primary
   "12311|12311|12311," .. -- volume as f(primary)
   "10|10|09," .. -- water f(primary)
   "10|20|09"
 -- stepping stone easy
-,"3@3@2@2@ level loaded get mining!@14,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=41,112,111|121|111,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
+,"3@3@2@2@  level loaded get mining!@14,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=41,112,111|121|111,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
 -- stepping stone medium
-,"3@3@2@2@ stepping stones in space@13,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=51,332,111|111|001,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
+,"3@3@2@2@  stepping stones in space@13,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=51,332,111|111|001,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
 -- stepping stone medium 2
-,"3@3@2@5@ solar storms hurt shield@13,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=51,332,111|111|001,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
+,"3@3@2@5@  solar storms hurt shield@13,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=51,332,111|111|001,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
 -- stepping stone hard
 ,"5@3@3@3@ fewer minerals more fun @13,001,001|001|001,12321|12321|12321,00|00|11,00|00|11=51,112,111|111|001,12111|12111|12321,00|11|00,11|00|00=41,003,001|001|001,12111|12111|12351,00|00|00,00|00|00"
 -- barren stripe
@@ -1784,9 +1808,9 @@ __gfx__
 04640466400464666640044466664004666666400464666640046400000464000004640046400000000000000000000000000000000000000000000000000000
 04440044400444444440000444444000444444000444444440044400000444000004440044400000000000000000000000000000000000000000000000000000
 __sfx__
-000500000c614000000e6140c6110c615000000c61425600256001060012600056000a60005600046000360003600026000160001600006000060000600006000000000000000000000000000000000000000000
-000400000700006650040000363002000016100130000000000003400035000370003700000000000002730029300000000000000000000000000000000000000000000000000000000000000000000000000000
-001500000d74416700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+010b00001f7351e024036000260001600016000060000600006000060000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+010b00001e0241f735036000200001600013000000000000340003500037000370000000000000273002930000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001500000d75416700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 010300000d5140f5110520015200102000b2000520000200002000020000200002000020000200002000020000200002000020000200002000020000200002000020000200002000020000200002000020000200
 01030000195141b5110b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01030000195141b511003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300003000030000300
